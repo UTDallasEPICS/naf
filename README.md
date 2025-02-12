@@ -20,7 +20,7 @@ The **NAF Alumni Tracking System** is a web-scraping project designed to gather 
   - Helps send invitations to reconnect with NAF’s network
 - **Data Analysis Support**:
   - Enables tracking of alumni career paths, achievements, and locations
-  - Supports NAF’s success development initiatives
+  - Supports NAF’s successful development initiatives
 
 ## Technology Stack
 - **Frontend**: To be determined (e.g., React, Next.js, Vue.js)
