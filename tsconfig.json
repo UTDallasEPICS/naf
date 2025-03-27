@@ -1,0 +1,15 @@
+{
+    "extends": "@tsconfig/node22/tsconfig.json",
+    "type": "module",
+    "compilerOptions": {
+        "module": "NodeNext",
+        "moduleResolution": "nodenext",
+        "target": "ES2022",
+        "sourceMap": true,
+        "esModuleInterop": true,
+        "outDir": "dist",
+        "forceConsistentCasingInFileNames": true
+    },
+    "include": ["src/**/*"],
+    "exclude": ["node_modules"]
+}

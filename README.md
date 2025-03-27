@@ -27,3 +27,8 @@ The **NAF Alumni Tracking System** is a web-scraping project designed to gather 
 - **Backend**: To be determined (e.g., Node.js, Django, Flask)
 - **Database**: To be determined (e.g., PostgreSQL, MongoDB, Firebase)
 - **Web Scraping Tools**: Selenium, BeautifulSoup, Scrapy, or other APIs
+
+## How to Run
+- TS files are located in the src folder
+- **TS to JS conversion**: ``` npm run build ```
+- **Execute JS file**: ``` node dist/main.js ```
