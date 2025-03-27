@@ -1,0 +1,25 @@
+{
+  "name": "naf",
+  "version": "1.0.0",
+  "description": "The **NAF Alumni Tracking System** is a web-scraping project designed to gather and organize data about NAF alumni using LinkedIn and other platforms. The goal is to automate the collection, updating, and maintenance of alumni records to support long-term engagement, build connections, and analyze career outcomes.",
+  "main": "index.js",
+  "type": "module",
+  "devDependencies": {
+    "@tsconfig/node22": "^22.0.1",
+    "@types/node": "^22.13.13",
+    "@types/selenium-webdriver": "^4.1.28",
+    "chromedriver": "^134.0.5",
+    "selenium-webdriver": "^4.30.0",
+    "typescript": "^5.8.2"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "build": "tsc && node dist/main.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "axios": "^1.8.4"
+  }
+}
