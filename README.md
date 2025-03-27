@@ -32,3 +32,4 @@ The **NAF Alumni Tracking System** is a web-scraping project designed to gather 
 - TS files are located in the src folder
 - **TS to JS conversion**: ``` npm run build ```
 - **Execute JS file**: ``` node dist/main.js ```
+- **TroubleShooting**: If there is a error stating File ``` '@tsconfig/node22/tsconfig.json' ``` not found, make sure to update to do Node 22
