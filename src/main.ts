@@ -5,6 +5,7 @@ async function headlessGoogle() {
     const chromeOptions = new Options();
     chromeOptions.addArguments(
         '--headless=new',
+        '--disable-gpu',
         '--no-sandbox',
         '--disable-dev-shm-usage'        
     );
