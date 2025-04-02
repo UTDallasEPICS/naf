@@ -6,6 +6,7 @@
   "type": "module",
   "devDependencies": {
     "@tsconfig/node22": "^22.0.1",
+    "@types/dotenv": "^8.2.3",
     "@types/node": "^22.13.13",
     "@types/selenium-webdriver": "^4.1.28",
     "chromedriver": "^134.0.5",
@@ -20,6 +21,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "axios": "^1.8.4"
+    "axios": "^1.8.4",
+    "dotenv": "^16.4.7"
   }
 }
