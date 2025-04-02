@@ -1,0 +1,12 @@
+version: '3.8'
+
+services:
+  crawler:
+    build: crawler/.
+    image: naf_crawler
+    container_name: naf_crawler
+    working_dir: /app
+    volumes:
+      - ./crawler:/app
+    ports: [] 
+    command: ["npm", "run", "start"]

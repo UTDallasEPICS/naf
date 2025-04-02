@@ -18,7 +18,7 @@ async function headlessGoogleApiSearchMultiplePages() {
   const apiKey = process.env.API_KEY;
   const srchID = process.env.SEARCH_ENGINE_ID;
 
-  if (!apiKey ||  srchID) {
+  if (!apiKey || !srchID) {
     console.error('API_KEY or SEARCH_ENGINE_ID not set in .env file');
     process.exit(1);
   }
