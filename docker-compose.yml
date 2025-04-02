@@ -3,6 +3,8 @@ version: '3.8'
 services:
   crawler:
     build: crawler/.
+    env_file:
+      - .env
     image: naf_crawler
     container_name: naf_crawler
     working_dir: /app
