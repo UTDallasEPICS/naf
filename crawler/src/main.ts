@@ -16,9 +16,9 @@ interface GoogleApiResponse {
 
 async function headlessGoogleApiSearchMultiplePages() {
   const apiKey = process.env.API_KEY;
-  const srchID = process.env.SEARCH_ENGINE_ID;
+  const srchID = process.env.SEARCH_ENGINE_ID; //cx
 
-  if (!apiKey ||  srchID) {
+  if (!apiKey || !srchID) {
     console.error('API_KEY or SEARCH_ENGINE_ID not set in .env file');
     process.exit(1);
   }
@@ -46,9 +46,7 @@ async function headlessGoogleApiSearchMultiplePages() {
     for (let i = 0; i < pages; i++) {
       // The start parameter is 1-indexed; 1, 11, 21, etc.
       const start = i * pageSize + 1;
-      const url = `https://www.googleapis.com/customsearch/v1?key=${apiKey} srchID=$ srchID}&q=${encodeURIComponent(
-        query
-      )}&num=${pageSize}&start=${start}`;
+      const url = `https://www.googleapis.com/customsearch/v1?key=${apiKey}&cx=${srchID}&q=${encodeURIComponent(query)}&num=${pageSize}&start=${start}`;
 
       // Use executeAsyncScript to run fetch inside the browser context.
       const data = await driver.executeAsyncScript(function (url: any, callback: any) {
