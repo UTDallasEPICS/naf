@@ -8,33 +8,25 @@ export class LinkedInScraper {
   private maxRetries: number;
   private retryDelay: number;
   private pagesDir: string;
+  private accessedUrls: Set<string>;
 
-  // Initialize the LinkedIn scraper
-  // driver - Selenium WebDriver instance
-  // maxRetries - Maximum number of retry attempts for authwall bypass
-  // retryDelay - Delay between retry attempts in milliseconds
   constructor(driver: WebDriver, maxRetries = 10, retryDelay = 1000) {
     this.driver = driver;
     this.maxRetries = maxRetries;
     this.retryDelay = retryDelay;
     this.pagesDir = path.join(process.cwd(), 'pages');
+    this.accessedUrls = new Set<string>();
     
-    // Create pages directory if it doesn't exist
     if (!fs.existsSync(this.pagesDir)) {
       fs.mkdirSync(this.pagesDir, { recursive: true });
       console.log('Created "pages" directory for storing HTML files');
     }
   }
 
-  // Delay execution for specified milliseconds
-  // ms - Milliseconds to delay
   private async delay(ms: number): Promise<void> {
     return new Promise(resolve => setTimeout(resolve, ms));
   }
   
-  // Save HTML content to a file in the pages directory
-  // html - HTML content to save
-  // filename - Name of the file to save
   private async saveHtmlToFile(html: string, filename: string): Promise<void> {
     return new Promise((resolve, reject) => {
       const filePath = path.join(this.pagesDir, filename);
@@ -48,40 +40,102 @@ export class LinkedInScraper {
     });
   }
 
-  // Check if the current page is an authwall
-  // returns True if on authwall page, false otherwise
   private async isAuthwall(): Promise<boolean> {
     const currentUrl = await this.driver.getCurrentUrl();
-    return currentUrl.includes('authwall') || currentUrl.includes('signup');
+    const pageSource = await this.driver.getPageSource();
+    
+    return currentUrl.includes('authwall') || 
+           currentUrl.includes('signup') || 
+           pageSource.includes('authwall') || 
+           pageSource.includes('Sign in to continue to LinkedIn');
   }
 
-  // Access a LinkedIn profile with authwall bypass attempts
-  // profileUrl - LinkedIn profile URL from Google search results
-  // searchResultUrl - Original Google search results URL to go back to
-  // returns True if successfully accessed the profile, false otherwise
+  private async simulateHumanBehavior(): Promise<void> {
+    const scrollAmount = Math.floor(Math.random() * 500) + 100;
+    await this.driver.executeScript(`window.scrollBy(0, ${scrollAmount});`);
+    
+    const randomDelay = Math.floor(Math.random() * 1000) + 500;
+    await this.delay(randomDelay);
+    
+    if (Math.random() > 0.7) {
+      const x = Math.floor(Math.random() * 500);
+      const y = Math.floor(Math.random() * 500);
+      await this.driver.executeScript(`
+        const event = new MouseEvent('mousemove', {
+          'view': window,
+          'bubbles': true,
+          'cancelable': true,
+          'clientX': ${x},
+          'clientY': ${y}
+        });
+        document.dispatchEvent(event);
+      `);
+    }
+  }
+
+  private async manageCookies(): Promise<void> {
+    const cookies = await this.driver.manage().getCookies();
+    for (const cookie of cookies) {
+      if (cookie.domain?.includes('linkedin.com') && 
+          (cookie.name.includes('auth') || cookie.name.includes('block'))) {
+        await this.driver.manage().deleteCookie(cookie.name);
+      }
+    }
+    
+    await this.driver.manage().addCookie({
+      name: 'lang', 
+      value: 'v=2&lang=en-us',
+      domain: '.linkedin.com'
+    });
+  }
+
   public async accessProfile(profileUrl: string, searchResultUrl: string): Promise<boolean> {
+    if (this.accessedUrls.has(profileUrl)) {
+      console.log(`Already accessed: ${profileUrl}. Skipping.`);
+      return true;
+    }
+    
     let attempts = 0;
     
-    // First try: direct access
-    await this.driver.get(profileUrl);
+    await this.driver.get('https://www.google.com/');
+    await this.delay(1500 + Math.random() * 500);
+    
+    await this.driver.executeScript(`
+      window.location.href = "${profileUrl}";
+    `);
+    
     console.log(`Trying to access: ${profileUrl}`);
     
-    // Check if we hit the authwall
     while (await this.isAuthwall() && attempts < this.maxRetries) {
       console.log(`Attempt ${attempts + 1}/${this.maxRetries}: Hit authwall, trying again...`);
       
-      // Go back to search results
-      await this.driver.get(searchResultUrl);
-      await this.delay(this.retryDelay);
+      if (attempts % 3 === 0) {
+        await this.driver.get(searchResultUrl);
+        await this.delay(this.retryDelay);
+        await this.driver.executeScript(`window.open("${profileUrl}", "_self");`);
+      } else if (attempts % 3 === 1) {
+        await this.driver.get('https://www.google.com/');
+        await this.delay(this.retryDelay);
+        await this.driver.executeScript(`
+          history.pushState({}, '', '${searchResultUrl}');
+          window.location.href = "${profileUrl}";
+        `);
+      } else {
+        await this.driver.get(searchResultUrl);
+        await this.delay(this.retryDelay);
+        await this.driver.executeScript(`
+          setTimeout(() => { window.location.href = "${profileUrl}"; }, 500);
+        `);
+        await this.delay(1000);
+      }
       
-      // Try accessing the profile directly again (simulating back-and-retry approach)
-      await this.driver.get(profileUrl);
+      await this.manageCookies();
+      await this.simulateHumanBehavior();
       
       attempts++;
-      await this.delay(this.retryDelay);
+      await this.delay(this.retryDelay + Math.random() * 1000);
     }
     
-    // Check if we successfully bypassed the authwall
     if (await this.isAuthwall()) {
       console.log(`Failed to bypass authwall after ${this.maxRetries} attempts.`);
       return false;
@@ -89,20 +143,18 @@ export class LinkedInScraper {
     
     console.log(`Successfully accessed profile after ${attempts} retry attempts.`);
     
-    // Get the HTML content and save it to a file
+    this.accessedUrls.add(profileUrl);
+    
     try {
-      // Wait a bit for the page to fully load
-      await this.delay(2000);
+      await this.delay(2000 + Math.random() * 1000);
+      await this.simulateHumanBehavior();
       
-      // Get the page source HTML
       const pageSource = await this.driver.getPageSource();
       
-      // Create a filename from the URL
       const profileId = profileUrl.split('/in/')[1].split('/')[0].split('?')[0];
       const timestamp = new Date().toISOString().replace(/:/g, '-');
       const filename = `${profileId}_${timestamp}.html`;
       
-      // Save HTML to file in pages directory
       await this.saveHtmlToFile(pageSource, filename);
       
       console.log(`HTML saved to pages/${filename}`);
@@ -114,33 +166,25 @@ export class LinkedInScraper {
     return true;
   }
 
-  // Process multiple LinkedIn profiles from search results
-  // searchResults - Array of search result items with title and link
-  // searchResultUrl - Original Google search results URL
-  // returns Array of successfully accessed profile URLs
   public async processProfiles(searchResults: { title: string, link: string }[], searchResultUrl: string): Promise<string[]> {
     const accessedProfiles = [];
     
     for (const result of searchResults) {
-      // Check if this is a LinkedIn profile URL
       if (result.link.includes('linkedin.com/in/')) {
         console.log(`\nProcessing profile: ${result.title}`);
         console.log(`URL: ${result.link}`);
         
-        // Try to access the profile
         const success = await this.accessProfile(result.link, searchResultUrl);
         
         if (success) {
           accessedProfiles.push(result.link);
           console.log(`Successfully accessed profile: ${result.title}`);
-          
-          // The profile page is currently loaded in the driver and HTML saved to file
         } else {
           console.log(`Failed to access profile: ${result.title}`);
         }
         
-        // Add a delay between profiles to avoid being detected as a bot
-        await this.delay(3000);
+        const randomDelay = 3000 + Math.floor(Math.random() * 2000);
+        await this.delay(randomDelay);
       }
     }
     
