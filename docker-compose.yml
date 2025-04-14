@@ -1,14 +1,20 @@
+# docker-compose.yml
 version: '3.8'
 
 services:
-  crawler:
-    build: crawler/.
-    env_file:
-      - .env
-    image: naf_crawler
-    container_name: naf_crawler
-    working_dir: /app
+  db:
+    image: postgres:latest
+    container_name: linkedindb
+    ports:
+      - "5434:5432"
+    environment:
+      POSTGRES_USER: linkedin_user
+      POSTGRES_PASSWORD: linkedin_pass
+      POSTGRES_DB: linkedin_db
     volumes:
-      - ./crawler:/app
-    ports: [] 
-    command: ["npm", "run", "start"]
+      - pgdata:/var/lib/postgresql/data
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+
+
+volumes:
+  pgdata:
