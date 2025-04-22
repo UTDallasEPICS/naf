@@ -2,3 +2,4 @@ node_modules
 dist
 .env
 pages
+data_json
