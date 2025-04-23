@@ -21,20 +21,20 @@ services:
       PGADMIN_DEFAULT_PASSWORD: password
     volumes:
       - pgadmin-data:/var/lib/pgadmin
-  naf_db:
-    image: postgres:15
-    container_name: naf_db
-    restart: always
-    environment:
-      POSTGRES_USER: epics
-      POSTGRES_PASSWORD: password
-      POSTGRES_DB: postgres
-    ports:
-      - "5432:5432"
-    volumes:
-      - pgdata:/var/lib/postgresql/data
+  # naf_db:
+  #   image: postgres:15
+  #   container_name: naf_db
+  #   restart: always
+  #   environment:
+  #     POSTGRES_USER: epics
+  #     POSTGRES_PASSWORD: password
+  #     POSTGRES_DB: postgres
+  #   ports:
+  #     - "5432:5432"
+  #   volumes:
+  #     - pgdata:/var/lib/postgresql/data
 
 
 volumes:
   pgadmin-data:
-  pgdata:
+  #pgdata:
