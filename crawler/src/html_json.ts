@@ -3,8 +3,7 @@ import * as fsp from 'fs/promises';
 import * as path from 'path';
 import { load, type CheerioAPI } from 'cheerio';
 
-// Define an interface for the structure of the extracted profile data.
-// Specifies the expected fields and their types (string or null, boolean).
+// Defines the structure for the extracted profile data.
 interface ProfileData {
   fullName: string | null;
   jobTitle: string | null;
@@ -14,222 +13,304 @@ interface ProfileData {
   phoneNumber: string | null;
   highSchool: string | null;
   HSGraduationYear: string | null;
-  NAFAcademy: boolean;
-  NAFTrackCertified: boolean;
-  address: string | null;
+  NAFAcademy: string | null;
+  NAFTrackCertified: string | null;
   city: string | null;
-  state: string | null;
-  zipCode: string | null;
-  birthdate: string | null;
-  militaryBranchServed: string | null;
   currentJob: string | null;
-  collegeMajor: string | null;
   universityGradYear: string | null;
   university: string | null;
   degree: string | null;
-  schoolDistrict: string | null;
   internshipCompany1: string | null;
   internshipEndDate1: string | null;
 }
 
-// Define constant paths for the directories where HTML pages are stored
-// and where the resulting JSON files will be saved.
+// Defines directory paths for input HTML and output JSON files.
 const pagesDir = path.join(process.cwd(), 'pages');
 const jsonDir = path.join(process.cwd(), 'data_json');
 
-// Ensure the 'pages' and 'data_json' directories exist, creating them if necessary.
-if (!fs.existsSync(pagesDir)) fs.mkdirSync(pagesDir, { recursive: true });
-if (!fs.existsSync(jsonDir)) fs.mkdirSync(jsonDir, { recursive: true });
+// Ensures the necessary directories exist, creating them if needed.
+if (!fs.existsSync(pagesDir)) {
+    console.log(`Creating pages directory: ${pagesDir}`);
+    fs.mkdirSync(pagesDir, { recursive: true });
+}
+if (!fs.existsSync(jsonDir)) {
+    console.log(`Creating JSON directory: ${jsonDir}`);
+    fs.mkdirSync(jsonDir, { recursive: true });
+}
 
-// Helper function to extract content from a meta tag using a CSS selector.
-// Takes a CheerioAPI instance ($) and selector string, returns content or null.
+// Helper function to extract content from a meta tag.
 function getMeta($: CheerioAPI, sel: string): string | null {
-  return $(sel).attr('content') ?? null; // Get 'content' attribute, default to null if not found
+  return $(sel).attr('content')?.trim() ?? null;
 }
 
-// Helper function to extract trimmed text content from an element using a CSS selector.
-// Takes a CheerioAPI instance ($) and selector string, returns trimmed text or null.
-function getText($: CheerioAPI, sel: string): string | null {
-  const t = $(sel).text().trim(); // Get text, trim whitespace
-  return t || null; // Return text if not empty, otherwise null
+// Helper function to extract text content using a primary selector
+function getText($: CheerioAPI, primarySelector: string): string | null {
+    let text: string | null = null;
+    const primaryElement = $(primarySelector).first();
+    if (primaryElement.length) {
+        text = primaryElement.text().trim();
+    }
+    return text || null;
 }
 
-// Helper function to extract specific data from JSON-LD script tags using a regex.
-// Takes a CheerioAPI instance ($) and a RegExp, returns the matched group or null.
+// Helper function to extract data from JSON-LD script using regex.
 function getJsonLd($: CheerioAPI, rx: RegExp): string | null {
-  // Find script tags of type application/ld+json and get their HTML content.
   const script = $('script[type="application/ld+json"]').html();
-  if (!script) return null; // Return null if no such script found
-  // Try to match the regex within the script content.
+  if (!script) return null;
   const m = script.match(rx);
-  return m?.[1] ?? null; // Return the first capture group (m[1]) or null if no match
+  return m?.[1]?.trim() ?? null;
 }
 
-// Function to convert a single HTML file (specified by filename) to a JSON file.
-// It parses the HTML, extracts data using helper functions, and writes a JSON file.
+// Converts a single HTML file to a JSON file.
 export function convertSingleFile(htmlFilename: string) {
-  const baseName = path.basename(htmlFilename); // Get the filename part (e.g., 'profile_ts.html')
-  const htmlPath = path.join(pagesDir, baseName); // Construct the full path to the HTML file
+  // Set up file paths and extract profile ID.
+  const baseName = path.basename(htmlFilename);
+  const htmlPath = path.join(pagesDir, baseName);
+  const idMatch = baseName.match(/^([^_]+)/);
+  if (!idMatch) {
+      console.warn(`Could not extract ID from filename: ${baseName}. Skipping conversion.`);
+      return;
+  }
+  const id = idMatch[1];
+  const jsonPath = path.join(jsonDir, `${id}.json`);
 
-  // Extract the profile ID from the filename (assumes format 'id_timestamp.html').
-  const id = baseName.split('_')[0];
-  const jsonPath = path.join(jsonDir, `${id}.json`); // Construct the full path for the output JSON file
-
-  // Check if the JSON file already exists; if so, skip conversion.
+  // Skip if JSON already exists or HTML doesn't exist.
   if (fs.existsSync(jsonPath)) {
-    // console.log(`JSON file already exists for ${baseName}. Skipping conversion.`);
-    return; // Exit the function
+    return;
   }
-
-  // Check if the source HTML file exists before proceeding.
   if (!fs.existsSync(htmlPath)) {
-    console.warn(`HTML file ${baseName} not found at path ${htmlPath} during conversion attempt.`);
-    return; // Exit if HTML file is missing
+    console.warn(`[convertSingleFile] HTML file ${baseName} not found at path ${htmlPath}. Skipping.`);
+    return;
   }
 
-  console.log(`Attempting conversion for: ${baseName}`);
+  console.log(`[convertSingleFile] Attempting conversion for: ${baseName}`);
   try {
-    // Read the HTML file content.
+    // Load HTML content using Cheerio.
     const html = fs.readFileSync(htmlPath, 'utf-8');
-    // Load the HTML content into Cheerio for parsing.
     const $ = load(html);
 
-    // Create a data object conforming to the ProfileData interface.
-    // Use helper functions (getMeta, getText, getJsonLd) to extract data.
+    // Extract Basic Profile Information.
+    let fullName: string | null = null;
+    const firstNameMeta = getMeta($, 'meta[property="profile:first_name"]');
+    const lastNameMeta = getMeta($, 'meta[property="profile:last_name"]');
+    if (firstNameMeta && lastNameMeta) {
+        fullName = `${firstNameMeta} ${lastNameMeta}`;
+    } else {
+        // *** Removed fallback selector array from getText call ***
+        fullName = firstNameMeta || lastNameMeta || getText($, 'h1.top-card-layout__title');
+    }
+    const jobTitleOg = getMeta($, 'meta[property="og:title"]');
+    const headlineH2 = getText($, 'h2.top-card-layout__headline');
+    const jobTitle = jobTitleOg || headlineH2;
+    const locationVisible = getText($, '.top-card-layout__first-subline > span:first-child');
+    const locationJsonLd = getJsonLd($, /"addressLocality":"(.*?)"/);
+    const location = locationVisible || locationJsonLd;
+    const city = locationJsonLd;
+    const linkedinLink = getMeta($, 'meta[property="og:url"]');
+    const email = $('a[href^="mailto:"]').attr('href')?.replace('mailto:', '').trim() ?? null;
+    const phoneNumber = getText($, 'span.phone');
+
+    // Extract Education Data.
+    let highSchool: string | null = null;
+    let HSGraduationYear: string | null = null;
+    let university: string | null = null;
+    let degree: string | null = null;
+    let universityGradYear: string | null = null;
+    const educationSection = $('section[data-section="educationsDetails"]');
+    if (educationSection.length > 0) {
+        educationSection.find('ul > li.education__list-item').each((_, el) => {
+            const schoolNameElement = $(el).find('h3 a').first().length ? $(el).find('h3 a').first() : $(el).find('h3').first();
+            const schoolName = schoolNameElement.text().trim() || null;
+            const degreeMajorElement = $(el).find('h4').first();
+            const degreeMajorText = degreeMajorElement.text().trim() || null;
+            const dateRangeElement = $(el).find('span.date-range').first();
+            const dateRangeText = dateRangeElement.text().trim() || null;
+
+            if (schoolName?.toLowerCase().includes('high school')) {
+                if (!highSchool) {
+                    highSchool = schoolName;
+                    if (dateRangeText) {
+                        const yearMatch = dateRangeText.match(/(\d{4})\s*$/);
+                        HSGraduationYear = yearMatch ? yearMatch[1] : null;
+                    }
+                }
+            } else {
+                 if (!university) {
+                    university = schoolName;
+                    if (degreeMajorText) {
+                        const parts = degreeMajorText.split(',').map(p => p.trim());
+                        degree = parts[0] || null;
+                    }
+                     if (dateRangeText) {
+                        const yearMatch = dateRangeText.match(/(\d{4})\s*$/);
+                        universityGradYear = yearMatch ? yearMatch[1] : null;
+                    }
+                 }
+            }
+        });
+    } else {
+        console.log(`[convertSingleFile] Education section not found for ${baseName}`);
+    }
+
+    // Check for NAF Involvement (Capture String).
+    let NAFAcademy: string | null = null;
+    let NAFTrackCertified: string | null = null;
+    const certSection = $('section[data-section="certifications"]');
+    if (certSection.length > 0) {
+        certSection.find('ul > li').each((_, el) => {
+            const certName = $(el).find('h3').first().text().trim() || null;
+            const issuerName = $(el).find('h4 a').first().text().trim() || null;
+            if (!NAFTrackCertified && certName?.toLowerCase().includes('naftrack')) {
+                NAFTrackCertified = certName;
+            }
+            if (!NAFAcademy && certName?.toLowerCase().includes('academy of finance')) {
+                NAFAcademy = certName;
+            }
+            if (issuerName?.toLowerCase() === 'naf') {
+                 if (!NAFTrackCertified) NAFTrackCertified = certName ?? "NAF Issued Certification";
+                 if (!NAFAcademy) NAFAcademy = certName ?? "NAF Issued Certification";
+            }
+        });
+    }
+    const orgSection = $('section[data-section="organizations"]');
+     if (!NAFAcademy && orgSection.length > 0) {
+        orgSection.find('ul > li').each((_, el) => {
+            const orgName = $(el).find('h3').first().text().trim() || null;
+            if (orgName?.toLowerCase().includes('academy of finance')) {
+                NAFAcademy = orgName;
+                return false;
+            }
+        });
+    }
+    if (!NAFAcademy && educationSection.length > 0) {
+        educationSection.find('ul > li.education__list-item').each((_, el) => {
+            const description = $(el).find('div[data-section="educations"] p').first().text().trim() || null;
+            if (description?.toLowerCase().includes('academy of finance')) {
+                NAFAcademy = "Academy of Finance (Mentioned in Education)";
+                return false;
+            }
+        });
+    }
+
+    // Extract Current Job.
+    let currentJob: string | null = null;
+    const expSection = $('section[data-section="experience"]');
+    if (expSection.length > 0) {
+        const firstExperienceItem = expSection.find('ul.experience__list > li').first();
+        const firstExpPosition = firstExperienceItem.hasClass('experience-group')
+            ? firstExperienceItem.find('ul.experience-group__positions > li').first()
+            : firstExperienceItem;
+        if (firstExpPosition.length > 0) {
+            const title = $(firstExpPosition).find('h3 span.experience-item__title').first().text().trim() || null;
+            const company = $(firstExpPosition).find('h4 span.experience-item__subtitle').first().text().trim() || null;
+            currentJob = title && company ? `${title} at ${company}` : title || company;
+        }
+    }
+    currentJob = currentJob || headlineH2;
+
+    // Extract Internship Data.
+    let internshipCompany1: string | null = null;
+    let internshipEndDate1: string | null = null;
+    if (expSection.length > 0) {
+         expSection.find('ul > li').each((_, el) => {
+            const title = $(el).find('h3 span.experience-item__title').first().text().trim() || null;
+            const companyElement = $(el).find('h4 span.experience-item__subtitle').first();
+            const dateElement = $(el).find('span.date-range').first();
+
+            if (title?.toLowerCase().includes('intern') || title?.toLowerCase().includes('analyst')) {
+                const durationText = dateElement.text().trim() || null;
+                if (durationText && (durationText.includes('mos') || /^\d+\s+yr(s)?$/.test(durationText) || /^\d{1,2}\s+mo(s)?$/.test(durationText))) {
+                     if (!internshipCompany1) {
+                        internshipCompany1 = companyElement.text().trim() || null;
+                         if (durationText) {
+                            const endDateMatch = durationText.match(/–\s*(\w+\s+\d{4}|\d{4})/);
+                            internshipEndDate1 = endDateMatch ? endDateMatch[1] : null;
+                             if (!internshipEndDate1) {
+                                 const singleDateMatch = durationText.match(/(\w+\s+\d{4}|\d{4})/);
+                                 internshipEndDate1 = singleDateMatch ? singleDateMatch[1] : null;
+                             }
+                        }
+                     }
+                }
+            }
+        });
+    }
+
+    // Assemble Final JSON Data.
     const data: ProfileData = {
-      fullName: (() => { // Immediately Invoked Function Expression (IIFE) for complex logic
-        const f = getMeta($, 'meta[property="profile:first_name"]');
-        const l = getMeta($, 'meta[property="profile:last_name"]');
-        return f && l ? `${f} ${l}` : f || l || null; // Combine first/last name if both exist
-      })(),
-      jobTitle: getMeta($, 'meta[property="og:title"]'), // Extract job title from Open Graph meta tag
-      location: getJsonLd($, /"addressLocality":"(.*?)"/), // Extract location from JSON-LD
-      linkedinLink: getMeta($, 'meta[property="og:url"]'), // Extract LinkedIn URL from Open Graph meta tag
-      email: $('a[href^="mailto:"]').attr('href')?.replace('mailto:', '') ?? null, // Extract email from mailto link
-      phoneNumber: getText($, 'span.phone'), // Extract phone number from span with class 'phone' (example selector)
-      // Extract various profile details from specific meta tags or JSON-LD.
-      highSchool: getMeta($, 'meta[property="profile:high_school"]'),
-      HSGraduationYear: getMeta($, 'meta[property="profile:hs_graduation_year"]'),
-      NAFAcademy: getMeta($, 'meta[property="profile:NAF_academy"]') === 'true', // Convert string 'true' to boolean
-      NAFTrackCertified: getMeta($, 'meta[property="profile:NAF_certified"]') === 'true', // Convert string 'true' to boolean
-      address: getJsonLd($, /"streetAddress":"(.*?)"/),
-      city: getJsonLd($, /"addressLocality":"(.*?)"/), // Note: Same regex as location
-      state: getJsonLd($, /"addressRegion":"(.*?)"/),
-      zipCode: getJsonLd($, /"postalCode":"(.*?)"/),
-      birthdate: getMeta($, 'meta[property="profile:birthdate"]'),
-      militaryBranchServed: getMeta($, 'meta[property="profile:military_branch"]'),
-      currentJob: getMeta($, 'meta[property="profile:current_job"]'),
-      collegeMajor: getMeta($, 'meta[property="profile:college_major"]'),
-      universityGradYear: getMeta($, 'meta[property="profile:university_graduation_year"]'),
-      university: getMeta($, 'meta[property="profile:university"]'),
-      degree: getMeta($, 'meta[property="profile:degree"]'),
-      schoolDistrict: getMeta($, 'meta[property="profile:school_district"]'),
-      internshipCompany1: getMeta($, 'meta[property="profile:internship_company_1"]'),
-      internshipEndDate1: getMeta($, 'meta[property="profile:internship_end_date_1"]'),
+      fullName: fullName,
+      jobTitle: jobTitle,
+      location: location,
+      linkedinLink: linkedinLink,
+      email: email,
+      phoneNumber: phoneNumber,
+      highSchool: highSchool,
+      HSGraduationYear: HSGraduationYear,
+      NAFAcademy: NAFAcademy,
+      NAFTrackCertified: NAFTrackCertified,
+      city: city,
+      currentJob: currentJob,
+      universityGradYear: universityGradYear,
+      university: university,
+      degree: degree,
+      internshipCompany1: internshipCompany1,
+      internshipEndDate1: internshipEndDate1,
     };
 
-    // Write the extracted data object to a JSON file, pretty-printed with 2 spaces.
+    // Write Data to JSON File.
     fs.writeFileSync(jsonPath, JSON.stringify(data, null, 2), 'utf-8');
-    console.log(`Successfully converted ${baseName} → ${id}.json`);
+    console.log(`[convertSingleFile] Successfully converted ${baseName} -> ${id}.json`);
+
   } catch (err: any) {
-    // Handle specific file access errors gracefully (e.g., file busy or just deleted).
+    // Handle Errors During Conversion.
     if (err.code === 'EBUSY' || err.code === 'ENOENT') {
-      console.warn(`Skipping ${baseName} conversion due to file access issue (${err.code}).`);
+      console.warn(`[convertSingleFile] Skipping ${baseName} conversion due to file access issue (${err.code}).`);
     } else {
-      // Log other unexpected errors during conversion.
-      console.error(`Error converting ${baseName}:`, err);
+      console.error(`[convertSingleFile] Error converting ${baseName}:`, err);
     }
   }
 }
 
-// Asynchronous function to perform a batch conversion of all HTML files in the 'pages' directory
-// that do not already have a corresponding JSON file in the 'data_json' directory.
+// Processes existing HTML files that haven't been converted to JSON yet.
 export async function convertNewHtmlFiles() {
   console.log('\n--- Starting batch HTML to JSON conversion ---');
   let convertedCount = 0;
   let skippedCount = 0;
 
   try {
-    // Read all files in the pages directory.
+    // Read HTML directory and filter for .html files.
     const files = await fsp.readdir(pagesDir);
-    // Filter for files ending with '.html'.
     const htmlFiles = files.filter(f => f.endsWith('.html'));
-
     console.log(`Found ${htmlFiles.length} HTML files in ${pagesDir}. Checking for conversions...`);
 
-    // Iterate through each found HTML file.
+    // Loop through HTML files, check if JSON exists, convert if not.
     for (const htmlFile of htmlFiles) {
-      // Extract the profile ID from the filename.
-      const id = htmlFile.split('_')[0];
-      const jsonPath = path.join(jsonDir, `${id}.json`); // Construct the expected JSON path
+      const idMatch = htmlFile.match(/^([^_]+)/);
+      if (!idMatch) {
+          console.log(`Skipping ${htmlFile}: Could not extract ID from filename.`);
+          continue;
+      }
+      const id = idMatch[1];
+      const jsonPath = path.join(jsonDir, `${id}.json`);
+      console.log(`Checking: ${htmlFile} (ID: ${id}, Expecting JSON: ${jsonPath})`);
 
       try {
-        // Check if the corresponding JSON file already exists using the promises API.
-        await fsp.access(jsonPath, fs.constants.F_OK);
-        // If access succeeds (no error thrown), the file exists. Increment skip count.
-        skippedCount++;
-      } catch (error: any) {
-        // If an error occurs, check if it's 'ENOENT' (Error NO ENTry/File Not Found).
-        if (error.code === 'ENOENT') {
-          // If JSON file doesn't exist, call convertSingleFile to process the HTML.
-          convertSingleFile(htmlFile);
-          convertedCount++; // Increment converted count
+        if (fs.existsSync(jsonPath)) {
+             console.log(`Skipping ${htmlFile}: JSON already exists.`);
+             skippedCount++;
         } else {
-          // Log any other errors encountered during the JSON file check.
-          console.error(`Error checking JSON file ${jsonPath}:`, error);
+             console.log(`Converting ${htmlFile}: JSON not found.`);
+             convertSingleFile(htmlFile);
+             convertedCount++;
         }
+      } catch (error: any) {
+          console.error(`Error processing ${htmlFile}:`, error);
       }
     }
-
-    // Log summary of the batch conversion results.
+    // Log batch completion summary.
     console.log(`Batch conversion complete. Converted: ${convertedCount}, Skipped (already exist): ${skippedCount}`);
   } catch (err) {
-    // Catch and log errors related to reading the pages directory itself.
     console.error(`Error reading pages directory during batch conversion: ${err}`);
   }
-
-  console.log('--- Finished batch HTML to JSON conversion ---\n');
-}
-
-// Function to set up a file system watcher on the 'pages' directory.
-// This will automatically trigger `convertSingleFile` when new HTML files are added or changed.
-export function startFileWatcher(): void {
-  console.log(`Starting file watcher for directory: ${pagesDir}`);
-
-  try {
-    // Use fs.watch to monitor the pages directory for changes.
-    fs.watch(pagesDir, (eventType, filename) => {
-      // Check if the event involves a filename and if it ends with '.html'.
-      if (filename && filename.endsWith('.html')) {
-        console.log(`File event detected: ${eventType} - ${filename}`);
-
-        // Use setTimeout to debounce and ensure the file write is complete before processing.
-        // This helps avoid issues where the watcher triggers before the file is fully written.
-        setTimeout(() => {
-          const filePath = path.join(pagesDir, filename);
-          // Double-check if the file still exists before attempting conversion.
-          if (fs.existsSync(filePath)) {
-            console.log(`Processing HTML file: ${filename}`);
-            convertSingleFile(filename); // Call the conversion function
-          } else {
-             console.log(`File ${filename} no longer exists. Skipping processing.`);
-          }
-        }, 500); // Wait 500ms before processing
-      }
-    });
-
-    console.log('File watcher is running. HTML files will be converted to JSON automatically when saved.');
-  } catch (error) {
-    // Catch and log any errors that occur during the setup of the file watcher.
-    console.error('Error starting file watcher:', error);
-  }
-}
-
-// Start the file watcher immediately when this module is loaded.
-startFileWatcher();
-
-// Check if this script is being run directly (not imported as a module).
-// If run directly, execute the batch conversion function.
-if (require.main === module) {
-  convertNewHtmlFiles();
+  console.log('Finished  HTML to JSON conversion\n');
 }
