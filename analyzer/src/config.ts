@@ -57,3 +57,12 @@ export const DEFAULT_WEIGHTS = {
   proximityUnder50mi: 0.1,
   proximity50to100mi: 0.05,
 } as const;
+
+/*
+TEMPORARY ACTION THRESHOLDS; replace later when model is trained
+ */
+export const TEMP_ACTION_BANDS = {
+  STRONG: 0.75,
+  PROBABLE: 0.65,
+  REVIEW: 0.55,
+};
