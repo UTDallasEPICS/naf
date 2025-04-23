@@ -23,6 +23,7 @@ export interface AnalysisResult {
     currentJobScore: number;
     proximityScore: number;
   };
+  action: string;
 }
 
 export type AnalyzerConfig = {

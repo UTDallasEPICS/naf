@@ -27,6 +27,14 @@ export class AlumniAnalyzer {
     return 0;
   }
 
+  private determineAction(confidenceScore: number): string {
+    // Temporary threshold; change later when model is trained
+    if (confidenceScore >= 0.75) return "Strong candidate";
+    if (confidenceScore >= 0.65) return "Probable alumni";
+    if (confidenceScore >= 0.55) return "Needs manual review";
+    return "Likely non-alumni";
+  }
+
   public analyze(criteria: AlumniCriteria): AnalysisResult {
     const isDefinite = criteria.academy !== null || criteria.trackCertified;
 
@@ -42,6 +50,7 @@ export class AlumniAnalyzer {
           currentJobScore: 0,
           proximityScore: 0,
         },
+        action: "Definite alumni",
       };
     }
 
@@ -65,6 +74,8 @@ export class AlumniAnalyzer {
       proximityScore,
     ].reduce((sum, val) => sum + val, 0);
 
+    const confidenceScore = Math.min(score, 1);
+
     return {
       isDefiniteAlumni: false,
       confidenceScore: Math.min(score, 1),
@@ -76,6 +87,7 @@ export class AlumniAnalyzer {
         currentJobScore: hasValidJob ? DEFAULT_WEIGHTS.currentJob : 0,
         proximityScore: proximityScore,
       },
+      action: this.determineAction(confidenceScore),
     };
   }
 }

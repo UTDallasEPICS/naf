@@ -32,3 +32,4 @@ console.log("Test Case Results:");
 console.log("Definite Alumni:", result.isDefiniteAlumni);
 console.log("Confidence Score:", result.confidenceScore);
 console.log("Score Breakdown:", result.breakdown);
+console.log("Action:", result.action);
