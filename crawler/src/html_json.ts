@@ -2,6 +2,9 @@ import * as fs from 'fs';
 import * as fsp from 'fs/promises';
 import * as path from 'path';
 import { load, type CheerioAPI } from 'cheerio';
+import * as dotenv from 'dotenv';
+import { Client } from 'pg';
+dotenv.config();
 
 // Defines the structure for the extracted profile data.
 interface ProfileData {
@@ -27,6 +30,23 @@ interface ProfileData {
 // Defines directory paths for input HTML and output JSON files.
 const pagesDir = path.join(process.cwd(), 'pages');
 const jsonDir = path.join(process.cwd(), 'data_json');
+
+
+const client = new Client({
+  host: process.env.PGHOST,           // Database host
+  port: parseInt(process.env.PGPORT || '5432', 10), // Database port (default to 5432)
+  user: process.env.PGUSER,           // Database user
+  password: process.env.PGPASSWORD,   // Database password
+  database: process.env.PGDATABASE    // Database name
+});
+
+client.connect()
+  .then(() => {
+    console.log('Connected to PostgreSQL');
+  })
+  .catch((err) => {
+    console.error('Connection error', err.stack);
+  });
 
 // Ensures the necessary directories exist, creating them if needed.
 if (!fs.existsSync(pagesDir)) {
@@ -61,8 +81,29 @@ function getJsonLd($: CheerioAPI, rx: RegExp): string | null {
   return m?.[1]?.trim() ?? null;
 }
 
+////////////////////////////////////////////////
+// Define types for the parameters
+interface CrawlerData {
+  [key: string]: any; // JSON can have dynamic keys, so we allow any value type
+}
+
+async function insertCrawlerData(profileUrl: string, jsonData: CrawlerData): Promise<void> {
+  const query = `
+    INSERT INTO crawler_data (profile_url, json)
+    VALUES ($1, $2) RETURNING crawler_id;
+  `;
+
+  try {
+    const res = await client.query(query, [profileUrl, jsonData]);
+    console.log('Data inserted with crawler_id:', res.rows[0].crawler_id);
+  } catch (error) {
+    console.error('Error inserting data:', error);
+  }
+}
+
+
 // Converts a single HTML file to a JSON file.
-export function convertSingleFile(htmlFilename: string) {
+export async function convertSingleFile(htmlFilename: string) {
   // Set up file paths and extract profile ID.
   const baseName = path.basename(htmlFilename);
   const htmlPath = path.join(pagesDir, baseName);
@@ -261,16 +302,25 @@ export function convertSingleFile(htmlFilename: string) {
     fs.writeFileSync(jsonPath, JSON.stringify(data, null, 2), 'utf-8');
     console.log(`[convertSingleFile] Successfully converted ${baseName} -> ${id}.json`);
 
-  } catch (err: any) {
-    // Handle Errors During Conversion.
-    if (err.code === 'EBUSY' || err.code === 'ENOENT') {
-      console.warn(`[convertSingleFile] Skipping ${baseName} conversion due to file access issue (${err.code}).`);
-    } else {
-      console.error(`[convertSingleFile] Error converting ${baseName}:`, err);
+    // Insert JSON data into PostgreSQL (using the insertCrawlerData function)
+    try {
+      await insertCrawlerData(baseName, data);  // Use this to insert into PostgreSQL
+      console.log(`[convertSingleFile] Successfully inserted ${baseName} -> ${id} into database`);
+    } catch (error: unknown) {
+      // Handle the error properly when it's unknown
+      if (error instanceof Error) {
+        console.error(`[convertSingleFile] Error inserting data into PostgreSQL:`, error.message);
+      } else {
+        console.error(`[convertSingleFile] Unknown error occurred during insertion.`);
+      }
     }
+
+  } catch (err: any) {
+  console.error(`[convertSingleFile] Error converting ${baseName}:`, err);
   }
 }
 
+// Processes existing HTML files that haven't been converted to JSON yet.
 // Processes existing HTML files that haven't been converted to JSON yet.
 export async function convertNewHtmlFiles() {
   console.log('\n--- Starting batch HTML to JSON conversion ---');
@@ -287,8 +337,8 @@ export async function convertNewHtmlFiles() {
     for (const htmlFile of htmlFiles) {
       const idMatch = htmlFile.match(/^([^_]+)/);
       if (!idMatch) {
-          console.log(`Skipping ${htmlFile}: Could not extract ID from filename.`);
-          continue;
+        console.log(`Skipping ${htmlFile}: Could not extract ID from filename.`);
+        continue;
       }
       const id = idMatch[1];
       const jsonPath = path.join(jsonDir, `${id}.json`);
@@ -296,21 +346,27 @@ export async function convertNewHtmlFiles() {
 
       try {
         if (fs.existsSync(jsonPath)) {
-             console.log(`Skipping ${htmlFile}: JSON already exists.`);
-             skippedCount++;
+          console.log(`Skipping ${htmlFile}: JSON already exists.`);
+          skippedCount++;
         } else {
-             console.log(`Converting ${htmlFile}: JSON not found.`);
-             convertSingleFile(htmlFile);
-             convertedCount++;
+          console.log(`Converting ${htmlFile}: JSON not found.`);
+          await convertSingleFile(htmlFile);
+          convertedCount++;
+
+          // After converting the file, insert the data into the database
+          const jsonData = JSON.parse(fs.readFileSync(jsonPath, 'utf-8')); // Read the JSON file
+          await insertCrawlerData(htmlFile, jsonData); // Insert into the database
+          console.log(`[convertNewHtmlFiles] Successfully inserted data for ${htmlFile} into database.`);
         }
-      } catch (error: any) {
-          console.error(`Error processing ${htmlFile}:`, error);
+      } catch (error: unknown) {
+        console.error(`Error processing ${htmlFile}:`, error);
       }
     }
+
     // Log batch completion summary.
     console.log(`Batch conversion complete. Converted: ${convertedCount}, Skipped (already exist): ${skippedCount}`);
-  } catch (err) {
-    console.error(`Error reading pages directory during batch conversion: ${err}`);
+  } catch (err: unknown) {
+    console.error(`Error reading pages directory during batch conversion:`, err);
   }
-  console.log('Finished  HTML to JSON conversion\n');
+  console.log('Finished HTML to JSON conversion\n');
 }
