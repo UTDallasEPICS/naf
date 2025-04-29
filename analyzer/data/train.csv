@@ -1,0 +1,34 @@
+id,academy,track_certified,high_school,company_internship,company_job,city,state,target
+1,CTE Industry Scholars Program,null,James Madison High School,NAF,Asphalt Green,New York City Metropolitan Area,New York,1
+2,NAF Academy of Information Technology,null,James Madison High School,null,null,Dallas,Texas,1
+3,Academy of Finance,null,Emmett J Conrad High School,null,null,Dallas,Texas,1
+4,Academy of Finance and Information Technology,Yes,Southwest Miami Senior High School,Zoo Miami,null,null,,1
+5,Academy of Engineering ,null,Hillcrest High School,"The Fab Lab at WorkChops, Verizon, Thaddeus Resource Center","Thaddeus Resouce Center, Target",Dallas,Texas,1
+6,null,null,Hillcrest High School,"NAF, Verizon",The University of Texas at Dallas,Richardson,Texas,1
+7,null,null,Emmett J Conrad High School,"NAF, Capital One, PEDIATRICS & ADOLESCENT HEALTH CARE",null,Garland,Texas,1
+8,null,null,Hillcrest High School,NAF,NAF,Dallas,Texas,1
+9,null,null,Skyline High School,Capital One,null,Dallas,Texas,1
+10,Academy of Engineering,null,Hillcrest High School,Capital One,null,Garland,Texas,1
+11,null,Yes,null,BNY Mellon Wealth Management,BNY Wealth,New York,New York,1
+12,null,Yes,Marjory Stoneman Douglass High School,null,Gator Student Investment Fund,Gainesville,Florida,1
+13,null,Yes,null,Protiviti,Protiviti,Fort Lauderdale,Florida,1
+14,null,Yes,null,null,University of Pissburgh,Fort Lee,New Jersey,1
+15,null,Yes,Coral Gables Senior High School,ServiceNow,ServiceNow,Orlando,Florida,1
+17,Information Technology,Yes,Haverhill High School,Haverhill Public Schools,Gordon College,Greater Boston,Massachusetts,1
+18,null,Yes,null,null,null,Miami,Florida,1
+19,ETech,Yes,Milpitas High School,"Cisco, Verizon, Raytheon Technologies","San Jose State University, NAF",San Francisco Bay Area,California,1
+20,null,null,null,null,"Safari Solutions, Inc.",Miami,Florida,0
+21,null,null,null,null,Quickplay,Los Angeles,California,0
+22,null,null,null,null,Iconoclast Entertainment Corporation,Atlanta Metropolitan Area,Georgia,0
+23,null,null,Secaucus Highscool,null,Big Block Capital Group,Los Angeles Metropolitan Area,California,0
+24,null,null,null,null,Elevate Entertainment Group,Austin,Texas,0
+25,null,null,null,null,CreativeFuture,Los Angeles,California,0
+26,null,null,null,null,Harvard Business School,Beverly Hills,California,0
+27,null,null,null,null,Carlin West Agency,New York City Metropolitan Area,New York,0
+28,null,null,null,null,Amaze,New York,New York,0
+29,null,null,null,null,Allstar,Brooklyn,New York,0
+30,null,null,Hendrick Hudson High School,null,Elevate Labs,Los Angeles Metropolitan Area,California,0
+31,null,null,null,null,Hewlett Packard Enterprise,Houston,Texas,0
+33,null,null,null,null,"IMAGE Studios, IsaBella Beauty Inc",Los Angeles,California,0
+35,null,null,Canton High School,"Kode With Klossy, MillerKnoll, Alcōv",null,Detroit Metropolitan Area,Michigan,0
+37,null,null,null,null,Bank of America Merrill Lynch,Flemington,New Jersey,0
