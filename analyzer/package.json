@@ -4,7 +4,9 @@
   "main": "dist/main.js",
   "scripts": {
     "build": "tsc",
-    "start": "node dist/main.js"
+    "start": "node dist/main.js",
+    "dev": "ts-node src/main.ts",
+    "watch": "nodemon src/main.ts"
   },
   "devDependencies": {
     "typescript": "^5.0.0",

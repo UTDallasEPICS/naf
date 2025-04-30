@@ -1,4 +1,4 @@
-version: '3.8'
+version: "3.8"
 
 services:
   crawler:
@@ -10,5 +10,15 @@ services:
     working_dir: /app
     volumes:
       - ./crawler:/app
-    ports: [] 
+    ports: []
+    command: ["npm", "run", "start"]
+  analyzer:
+    build: analyzer/.
+    env_file:
+      - .env
+    image: naf_analyzer
+    container_name: naf_analyzer
+    working_dir: /app
+    volumes:
+      - ./analyzer:/app
     command: ["npm", "run", "start"]
