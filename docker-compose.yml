@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   crawler:
     build: crawler/.
@@ -12,3 +10,31 @@ services:
       - ./crawler:/app
     ports: [] 
     command: ["npm", "run", "start"]
+  pgadmin:
+    image: dpage/pgadmin4
+    container_name: naf_pgadmin
+    restart: always
+    ports:
+      - "8888:80"
+    environment:
+      PGADMIN_DEFAULT_EMAIL: epics@epics.com
+      PGADMIN_DEFAULT_PASSWORD: password
+    volumes:
+      - pgadmin-data:/var/lib/pgadmin
+  # naf_db:
+  #   image: postgres:15
+  #   container_name: naf_db
+  #   restart: always
+  #   environment:
+  #     POSTGRES_USER: epics
+  #     POSTGRES_PASSWORD: password
+  #     POSTGRES_DB: postgres
+  #   ports:
+  #     - "5432:5432"
+  #   volumes:
+  #     - pgdata:/var/lib/postgresql/data
+
+
+volumes:
+  pgadmin-data:
+  #pgdata:

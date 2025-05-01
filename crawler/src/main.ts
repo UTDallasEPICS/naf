@@ -1,89 +1,162 @@
 import { Builder } from 'selenium-webdriver';
 import { Options } from 'selenium-webdriver/chrome.js';
 import dotenv from 'dotenv';
+import { LinkedInScraper } from './linkedinScraper.js';
+import { convertNewHtmlFiles } from './html_json.js'; // Import the batch conversion function
 
+// Load environment variables.
 dotenv.config();
 
+// Define TypeScript interfaces for Google API data structures.
 interface GoogleApiItem {
   title: string;
   link: string;
 }
-
 interface GoogleApiResponse {
   error?: string;
   items?: GoogleApiItem[];
 }
 
-async function headlessGoogleApiSearchMultiplePages() {
+// Main function definition.
+async function searchAndAccessLinkedInProfiles() {
+  // Get API credentials from environment.
   const apiKey = process.env.API_KEY;
-  const srchID = process.env.SEARCH_ENGINE_ID; //cx
+  const srchID = process.env.SEARCH_ENGINE_ID;
 
+  // Validate essential configuration.
   if (!apiKey || !srchID) {
     console.error('API_KEY or SEARCH_ENGINE_ID not set in .env file');
     process.exit(1);
   }
 
+  // Set search parameters.
   const query = 'site:linkedin.com/in "NAFTrack"';
-  const pageSize = 10; // maximum allowed per request
-  const totalResults = 20; // desired total results
-  const pages = Math.ceil(totalResults / pageSize);
+  const pageSize = 10;
+  const totalResultsTarget = 20;
+  const pages = Math.ceil(totalResultsTarget / pageSize);
   let allItems: GoogleApiItem[] = [];
 
+  // Configure Chrome options for WebDriver.
   const chromeOptions = new Options();
   chromeOptions.addArguments(
     '--headless=new',
     '--disable-gpu',
     '--no-sandbox',
-    '--disable-dev-shm-usage'
+    '--disable-dev-shm-usage',
+    '--disable-blink-features=AutomationControlled',
+    '--window-size=1920,1080',
+    '--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36'
   );
+  chromeOptions.setUserPreferences({
+    'excludeSwitches': ['enable-automation'],
+    'useAutomationExtension': false,
+    'credentials_enable_service': false
+  });
 
+  // Initialize WebDriver.
   const driver = await new Builder()
     .forBrowser('chrome')
     .setChromeOptions(chromeOptions)
     .build();
 
+  // Main execution block.
   try {
-    for (let i = 0; i < pages; i++) {
-      // The start parameter is 1-indexed; 1, 11, 21, etc.
-      const start = i * pageSize + 1;
-      const url = `https://www.googleapis.com/customsearch/v1?key=${apiKey}&cx=${srchID}&q=${encodeURIComponent(query)}&num=${pageSize}&start=${start}`;
-
-      // Use executeAsyncScript to run fetch inside the browser context.
-      const data = await driver.executeAsyncScript(function (url: any, callback: any) {
-        fetch(url)
-          .then((response: any) => response.json())
-          .then((result: any) => callback(result))
-          .catch((error: any) => callback({ error: error.toString() }));
-      }, url) as unknown as GoogleApiResponse;
-
-      if (data.error) {
-        console.error('Error on page starting at', start, ':', data.error);
-        continue; // or break if you want to stop on error
+    // Modify browser properties to hide automation.
+    await driver.executeScript(`
+      Object.defineProperty(navigator, 'webdriver', { get: () => false });
+      window.navigator.chrome = { runtime: {} };
+      if (window.navigator.permissions) {
+        const originalQuery = window.navigator.permissions.query;
+        window.navigator.permissions.query = (parameters) => (
+          parameters.name === 'notifications' ? Promise.resolve({ state: Notification.permission }) : originalQuery(parameters)
+        );
       }
+    `);
 
-      if (data.items && data.items.length > 0) {
-        allItems = allItems.concat(data.items);
-      } else {
-        console.log('No results found on page starting at', start);
-      }
+    // Initialize scraper.
+    const scraper = new LinkedInScraper(driver, 15, 2000); 
+    await convertNewHtmlFiles(); // Process any existing HTML files first
 
-      // Optional: wait a little bit between requests
-      await new Promise(resolve => setTimeout(resolve, 1000));
-    }
+    // Start search.
+    console.log(`Starting search for: ${query}`);
 
+    // Prepare indices for parallel page fetching.
+    const pageIndices = Array.from({ length: pages }, (_, i) => i);
+
+    // Map page indices to parallel search tasks, replicating original loop logic including delay.
+    const searchPromises = pageIndices.map(async (i) => {
+        let pageItems: GoogleApiItem[] = [];
+        const start = i * pageSize + 1;
+        const url = `https://www.googleapis.com/customsearch/v1?key=${apiKey}&cx=${srchID}&q=${encodeURIComponent(query)}&num=${pageSize}&start=${start}`;
+
+        console.log(`Fetching search results page ${i + 1}, starting at result ${start}...`);
+
+        try {
+             // Fetch results for one page via browser script.
+            const data = await driver.executeAsyncScript(function(urlToFetch: string, callback: (result: GoogleApiResponse) => void) {
+                fetch(urlToFetch)
+                    .then(response => response.json())
+                    .then(result => callback(result as GoogleApiResponse))
+                    .catch(error => callback({ error: error.toString() }));
+            }, url) as GoogleApiResponse;
+
+            // Handle response data or errors for the page.
+            if (data.error) {
+                console.error('Error on page starting at', start, ':', data.error);
+            } else if (data.items && data.items.length > 0) {
+                pageItems = data.items;
+                console.log(`Found ${data.items.length} results on this page.`);
+            } else {
+                 console.log('No results found on page starting at', start);
+            }
+        } catch (taskError) {
+             console.error(`Error during fetch task for page index ${i}:`, taskError);
+        }
+
+        // Apply delay within each task.
+        const taskDelay = 1000 + Math.random() * 1000; // Delay between Google API calls
+        await new Promise(resolve => setTimeout(resolve, taskDelay));
+        return pageItems;
+    });
+
+    // Await completion of all parallel search tasks.
+    const resultsFromPages = await Promise.all(searchPromises);
+    console.log("Search phase complete.");
+
+    // Consolidate results and enforce target limit.
+    allItems = resultsFromPages.flat().slice(0, totalResultsTarget);
+
+    // Process profiles if results were found.
     if (allItems.length > 0) {
-      console.log(`Found ${allItems.length} results:\n`);
-      allItems.forEach(item => {
-        console.log(`Title: ${item.title}`);
-        console.log(`Link: ${item.link}`);
-        console.log('---------------------------');
+      console.log(`\nFound ${allItems.length} total results. Starting profile processing...`);
+      const googleSearchUrl = `https://www.google.com/search?q=${encodeURIComponent(query)}`;
+      // Navigate to Google search page (referer).
+      await driver.get(googleSearchUrl);
+      await new Promise(resolve => setTimeout(resolve, 2000 + Math.random() * 1000)); // Wait after navigating
+
+      // Initiate profile processing via the scraper.
+      const accessedProfiles = await scraper.processProfiles(allItems, googleSearchUrl);
+      console.log(`\nSuccessfully accessed ${accessedProfiles.length} out of ${allItems.length} profiles targeted.`);
+      // Log successfully accessed profiles.
+      accessedProfiles.forEach((url, index) => {
+        console.log(`${index + 1}. Successfully accessed: ${url}`);
       });
     } else {
-      console.log('No results found.');
+      console.log('No results found from Google Search.');
     }
+  // Catch errors during main execution.
+  } catch (error) {
+    console.error('An error occurred during the process:', error);
+  // Ensure browser closes properly.
   } finally {
-    await driver.quit();
+    if (driver) { // Check if driver was successfully initialized
+        await driver.quit();
+        console.log("Browser session ended.");
+    } else {
+        console.log("Driver not initialized, no browser session to end.");
+    }
   }
 }
 
-headlessGoogleApiSearchMultiplePages().catch(console.error);
+// Execute the main function and catch any top-level errors.
+searchAndAccessLinkedInProfiles().catch(console.error);
