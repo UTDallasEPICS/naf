@@ -1,3 +1,6 @@
 node_modules
 dist
-.env
+.env.venv/
+*.DS_Store
+__pycache__/
+*.csv

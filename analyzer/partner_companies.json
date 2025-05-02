@@ -1,0 +1,30 @@
+// partner_companies.json
+[
+    { "name": "Canva" },
+    { "name": "HOSA" },
+    { "name": "AAMC" },
+    { "name": "ACTE" },
+    { "name": "Advance CTE" },
+    { "name": "AICPA" },
+    { "name": "AHLA" },
+    { "name": "American Accounting Association" },
+    { "name": "Code.org" },
+    { "name": "CSTA" },
+    { "name": "CYBER.ORG" },
+    { "name": "Discover Engineering" },
+    { "name": "EarSketch" },
+    { "name": "EVERFI" },
+    { "name": "Federal Reserve Bank of St. Louis" },
+    { "name": "GTTP" },
+    { "name": "KPMG" },
+    { "name": "LabXchange" },
+    { "name": "Marriott International" },
+    { "name": "NCHSE" },
+    { "name": "NGPF" },
+    { "name": "NFTE" },
+    { "name": "PLTW" },
+    { "name": "SAP" },
+    { "name": "Verizon" },
+    { "name": "Wilmington University" }
+  ]
+  
