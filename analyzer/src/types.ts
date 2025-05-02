@@ -26,6 +26,12 @@ export interface AnalysisResult {
   action: string;
 }
 
+export interface LocationObject {
+  city?: string;
+  state?: string;
+  country?: string;
+}
+
 export type AnalyzerConfig = {
   academyLocations: AcademyLocation[];
   weights: typeof import("./config").DEFAULT_WEIGHTS;
