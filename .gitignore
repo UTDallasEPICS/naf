@@ -1,6 +1,10 @@
-node_modules
-dist
-.env.venv/
-*.DS_Store
+# Python
+.venv/
 __pycache__/
+*.py[cod]
+# MacOS cruft
+.DS_Store
+# Data
 *.csv
+*.tsv
+*.parquet
