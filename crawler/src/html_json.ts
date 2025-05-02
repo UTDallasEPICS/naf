@@ -6,11 +6,14 @@ import * as dotenv from 'dotenv';
 import { Client } from 'pg';
 dotenv.config();
 
-// Defines the structure for the extracted profile data.
 interface ProfileData {
   fullName: string | null;
   jobTitle: string | null;
-  location: string | null;
+  location: {
+    city: string | null;
+    state: string | null;
+    country: string | null;
+  };
   linkedinLink: string | null;
   email: string | null;
   phoneNumber: string | null;
@@ -18,7 +21,6 @@ interface ProfileData {
   HSGraduationYear: string | null;
   NAFAcademy: string | null;
   NAFTrackCertified: string | null;
-  city: string | null;
   currentJob: string | null;
   universityGradYear: string | null;
   university: string | null;
@@ -27,17 +29,15 @@ interface ProfileData {
   internshipEndDate1: string | null;
 }
 
-// Defines directory paths for input HTML and output JSON files.
 const pagesDir = path.join(process.cwd(), 'pages');
 const jsonDir = path.join(process.cwd(), 'data_json');
 
-
 const client = new Client({
-  host: process.env.PGHOST,           // Database host
-  port: parseInt(process.env.PGPORT || '5432', 10), // Database port (default to 5432)
-  user: process.env.PGUSER,           // Database user
-  password: process.env.PGPASSWORD,   // Database password
-  database: process.env.PGDATABASE    // Database name
+  host: process.env.PGHOST,
+  port: parseInt(process.env.PGPORT || '5432', 10),
+  user: process.env.PGUSER,
+  password: process.env.PGPASSWORD,
+  database: process.env.PGDATABASE
 });
 
 client.connect()
@@ -48,7 +48,6 @@ client.connect()
     console.error('Connection error', err.stack);
   });
 
-// Ensures the necessary directories exist, creating them if needed.
 if (!fs.existsSync(pagesDir)) {
     console.log(`Creating pages directory: ${pagesDir}`);
     fs.mkdirSync(pagesDir, { recursive: true });
@@ -58,12 +57,10 @@ if (!fs.existsSync(jsonDir)) {
     fs.mkdirSync(jsonDir, { recursive: true });
 }
 
-// Helper function to extract content from a meta tag.
 function getMeta($: CheerioAPI, sel: string): string | null {
   return $(sel).attr('content')?.trim() ?? null;
 }
 
-// Helper function to extract text content using a primary selector
 function getText($: CheerioAPI, primarySelector: string): string | null {
     let text: string | null = null;
     const primaryElement = $(primarySelector).first();
@@ -73,7 +70,6 @@ function getText($: CheerioAPI, primarySelector: string): string | null {
     return text || null;
 }
 
-// Helper function to extract data from JSON-LD script using regex.
 function getJsonLd($: CheerioAPI, rx: RegExp): string | null {
   const script = $('script[type="application/ld+json"]').html();
   if (!script) return null;
@@ -81,10 +77,8 @@ function getJsonLd($: CheerioAPI, rx: RegExp): string | null {
   return m?.[1]?.trim() ?? null;
 }
 
-////////////////////////////////////////////////
-// Define types for the parameters
 interface CrawlerData {
-  [key: string]: any; // JSON can have dynamic keys, so we allow any value type
+  [key: string]: any;
 }
 
 async function insertCrawlerData(profileUrl: string, jsonData: CrawlerData): Promise<void> {
@@ -92,7 +86,6 @@ async function insertCrawlerData(profileUrl: string, jsonData: CrawlerData): Pro
     INSERT INTO crawler_data (profile_url, json)
     VALUES ($1, $2) RETURNING crawler_id;
   `;
-
   try {
     const res = await client.query(query, [profileUrl, jsonData]);
     console.log('Data inserted with crawler_id:', res.rows[0].crawler_id);
@@ -101,10 +94,7 @@ async function insertCrawlerData(profileUrl: string, jsonData: CrawlerData): Pro
   }
 }
 
-
-// Converts a single HTML file to a JSON file.
 export async function convertSingleFile(htmlFilename: string) {
-  // Set up file paths and extract profile ID.
   const baseName = path.basename(htmlFilename);
   const htmlPath = path.join(pagesDir, baseName);
   const idMatch = baseName.match(/^([^_]+)/);
@@ -115,7 +105,6 @@ export async function convertSingleFile(htmlFilename: string) {
   const id = idMatch[1];
   const jsonPath = path.join(jsonDir, `${id}.json`);
 
-  // Skip if JSON already exists or HTML doesn't exist.
   if (fs.existsSync(jsonPath)) {
     return;
   }
@@ -126,32 +115,36 @@ export async function convertSingleFile(htmlFilename: string) {
 
   console.log(`[convertSingleFile] Attempting conversion for: ${baseName}`);
   try {
-    // Load HTML content using Cheerio.
     const html = fs.readFileSync(htmlPath, 'utf-8');
     const $ = load(html);
 
-    // Extract Basic Profile Information.
     let fullName: string | null = null;
     const firstNameMeta = getMeta($, 'meta[property="profile:first_name"]');
     const lastNameMeta = getMeta($, 'meta[property="profile:last_name"]');
     if (firstNameMeta && lastNameMeta) {
         fullName = `${firstNameMeta} ${lastNameMeta}`;
     } else {
-        // *** Removed fallback selector array from getText call ***
         fullName = firstNameMeta || lastNameMeta || getText($, 'h1.top-card-layout__title');
     }
     const jobTitleOg = getMeta($, 'meta[property="og:title"]');
     const headlineH2 = getText($, 'h2.top-card-layout__headline');
     const jobTitle = jobTitleOg || headlineH2;
-    const locationVisible = getText($, '.top-card-layout__first-subline > span:first-child');
-    const locationJsonLd = getJsonLd($, /"addressLocality":"(.*?)"/);
-    const location = locationVisible || locationJsonLd;
-    const city = locationJsonLd;
+
+    // Extract location fields from JSON-LD
+    const city = getJsonLd($, /"addressLocality":"(.*?)"/);
+    const state = getJsonLd($, /"addressRegion":"(.*?)"/);
+    const country = getJsonLd($, /"addressCountry":"(.*?)"/);
+
+    const location = {
+      city: city,
+      state: state,
+      country: country,
+    };
+
     const linkedinLink = getMeta($, 'meta[property="og:url"]');
     const email = $('a[href^="mailto:"]').attr('href')?.replace('mailto:', '').trim() ?? null;
     const phoneNumber = getText($, 'span.phone');
 
-    // Extract Education Data.
     let highSchool: string | null = null;
     let HSGraduationYear: string | null = null;
     let university: string | null = null;
@@ -189,11 +182,8 @@ export async function convertSingleFile(htmlFilename: string) {
                  }
             }
         });
-    } else {
-        console.log(`[convertSingleFile] Education section not found for ${baseName}`);
     }
 
-    // Check for NAF Involvement (Capture String).
     let NAFAcademy: string | null = null;
     let NAFTrackCertified: string | null = null;
     const certSection = $('section[data-section="certifications"]');
@@ -214,7 +204,7 @@ export async function convertSingleFile(htmlFilename: string) {
         });
     }
     const orgSection = $('section[data-section="organizations"]');
-     if (!NAFAcademy && orgSection.length > 0) {
+    if (!NAFAcademy && orgSection.length > 0) {
         orgSection.find('ul > li').each((_, el) => {
             const orgName = $(el).find('h3').first().text().trim() || null;
             if (orgName?.toLowerCase().includes('academy of finance')) {
@@ -233,7 +223,6 @@ export async function convertSingleFile(htmlFilename: string) {
         });
     }
 
-    // Extract Current Job.
     let currentJob: string | null = null;
     const expSection = $('section[data-section="experience"]');
     if (expSection.length > 0) {
@@ -249,7 +238,6 @@ export async function convertSingleFile(htmlFilename: string) {
     }
     currentJob = currentJob || headlineH2;
 
-    // Extract Internship Data.
     let internshipCompany1: string | null = null;
     let internshipEndDate1: string | null = null;
     if (expSection.length > 0) {
@@ -257,7 +245,6 @@ export async function convertSingleFile(htmlFilename: string) {
             const title = $(el).find('h3 span.experience-item__title').first().text().trim() || null;
             const companyElement = $(el).find('h4 span.experience-item__subtitle').first();
             const dateElement = $(el).find('span.date-range').first();
-
             if (title?.toLowerCase().includes('intern') || title?.toLowerCase().includes('analyst')) {
                 const durationText = dateElement.text().trim() || null;
                 if (durationText && (durationText.includes('mos') || /^\d+\s+yr(s)?$/.test(durationText) || /^\d{1,2}\s+mo(s)?$/.test(durationText))) {
@@ -277,7 +264,6 @@ export async function convertSingleFile(htmlFilename: string) {
         });
     }
 
-    // Assemble Final JSON Data.
     const data: ProfileData = {
       fullName: fullName,
       jobTitle: jobTitle,
@@ -289,7 +275,6 @@ export async function convertSingleFile(htmlFilename: string) {
       HSGraduationYear: HSGraduationYear,
       NAFAcademy: NAFAcademy,
       NAFTrackCertified: NAFTrackCertified,
-      city: city,
       currentJob: currentJob,
       universityGradYear: universityGradYear,
       university: university,
@@ -298,16 +283,13 @@ export async function convertSingleFile(htmlFilename: string) {
       internshipEndDate1: internshipEndDate1,
     };
 
-    // Write Data to JSON File.
     fs.writeFileSync(jsonPath, JSON.stringify(data, null, 2), 'utf-8');
     console.log(`[convertSingleFile] Successfully converted ${baseName} -> ${id}.json`);
 
-    // Insert JSON data into PostgreSQL (using the insertCrawlerData function)
     try {
-      await insertCrawlerData(baseName, data);  // Use this to insert into PostgreSQL
+      await insertCrawlerData(baseName, data);
       console.log(`[convertSingleFile] Successfully inserted ${baseName} -> ${id} into database`);
     } catch (error: unknown) {
-      // Handle the error properly when it's unknown
       if (error instanceof Error) {
         console.error(`[convertSingleFile] Error inserting data into PostgreSQL:`, error.message);
       } else {
@@ -316,24 +298,20 @@ export async function convertSingleFile(htmlFilename: string) {
     }
 
   } catch (err: any) {
-  console.error(`[convertSingleFile] Error converting ${baseName}:`, err);
+    console.error(`[convertSingleFile] Error converting ${baseName}:`, err);
   }
 }
 
-// Processes existing HTML files that haven't been converted to JSON yet.
-// Processes existing HTML files that haven't been converted to JSON yet.
 export async function convertNewHtmlFiles() {
   console.log('\n--- Starting batch HTML to JSON conversion ---');
   let convertedCount = 0;
   let skippedCount = 0;
 
   try {
-    // Read HTML directory and filter for .html files.
     const files = await fsp.readdir(pagesDir);
     const htmlFiles = files.filter(f => f.endsWith('.html'));
     console.log(`Found ${htmlFiles.length} HTML files in ${pagesDir}. Checking for conversions...`);
 
-    // Loop through HTML files, check if JSON exists, convert if not.
     for (const htmlFile of htmlFiles) {
       const idMatch = htmlFile.match(/^([^_]+)/);
       if (!idMatch) {
@@ -352,10 +330,8 @@ export async function convertNewHtmlFiles() {
           console.log(`Converting ${htmlFile}: JSON not found.`);
           await convertSingleFile(htmlFile);
           convertedCount++;
-
-          // After converting the file, insert the data into the database
-          const jsonData = JSON.parse(fs.readFileSync(jsonPath, 'utf-8')); // Read the JSON file
-          await insertCrawlerData(htmlFile, jsonData); // Insert into the database
+          const jsonData = JSON.parse(fs.readFileSync(jsonPath, 'utf-8'));
+          await insertCrawlerData(htmlFile, jsonData);
           console.log(`[convertNewHtmlFiles] Successfully inserted data for ${htmlFile} into database.`);
         }
       } catch (error: unknown) {
@@ -363,7 +339,6 @@ export async function convertNewHtmlFiles() {
       }
     }
 
-    // Log batch completion summary.
     console.log(`Batch conversion complete. Converted: ${convertedCount}, Skipped (already exist): ${skippedCount}`);
   } catch (err: unknown) {
     console.error(`Error reading pages directory during batch conversion:`, err);
