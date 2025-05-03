@@ -131,15 +131,33 @@ export async function convertSingleFile(htmlFilename: string) {
     const jobTitle = jobTitleOg || headlineH2;
 
     // Extract location fields from JSON-LD
-    const city = getJsonLd($, /"addressLocality":"(.*?)"/);
-    const state = getJsonLd($, /"addressRegion":"(.*?)"/);
-    const country = getJsonLd($, /"addressCountry":"(.*?)"/);
-
-    const location = {
-      city: city,
-      state: state,
-      country: country,
+    interface Location {
+      city: string | null;
+      state: string | null;
+      country: string | null;
+    }
+    
+    const location: Location = {
+      city: 'null',
+      state: 'null',
+      country: 'null',
     };
+    
+    const locationString: string | null = getJsonLd($, /"addressLocality":"(.*?)"/);
+    
+    if (locationString) {
+      const parts = locationString.split(',').map(part => part.trim());
+    
+      location.city = parts[0] || null;
+      location.state = parts[1] || null;
+      location.country = parts[2] || null;
+    
+      //console.log(location);
+    } else {
+      console.log("Location data not found.");
+    }
+    
+
 
     const linkedinLink = getMeta($, 'meta[property="og:url"]');
     const email = $('a[href^="mailto:"]').attr('href')?.replace('mailto:', '').trim() ?? null;
