@@ -1,4 +1,3 @@
-// academies.json
 [
     { "city": "Atmore", "state": "AL", "lat": 31.025837, "lon": -87.506462 },
     { "city": "Birmingham", "state": "AL", "lat": 33.518589, "lon": -86.810356 },
