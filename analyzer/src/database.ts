@@ -134,12 +134,39 @@ class DatabaseService {
     }
   }
 
+  async fetchExistingRecord(profileUrl: string): Promise<boolean> {
+    try {
+      const result = await this.client.query(
+        "SELECT 1 FROM unconfirmed_alumni WHERE profile_url = $1",
+        [profileUrl]
+      );
+      return result.rows.length > 0;
+    } catch (error) {
+      console.error("Error checking for existing record:", error);
+      return false;
+    }
+  }
+
   async insertUnconfirmedAnalyzerRecord(
     record: unconfirmedAnalyzerRecord
   ): Promise<number | null> {
     try {
-      const result = await this.client.query<{ analyzer_id: number }>(
-        `INSERT INTO unconfirmed_alumni (
+      const existing = await this.client.query<{ analyzer_id: number }>(
+        "SELECT analyzer_id FROM unconfirmed_alumni WHERE profile_url = $1",
+        [record.profile_url]
+      );
+      if (existing.rows.length > 0) {
+        await this.client.query(
+          `UPDATE unconfirmed_alumni SET
+         confidence_percentage = $1,
+         full_name = $2
+         WHERE profile_url = $3`,
+          [record.confidence_percentage, record.full_name, record.profile_url]
+        );
+        return existing.rows[0].analyzer_id;
+      } else {
+        const result = await this.client.query<{ analyzer_id: number }>(
+          `INSERT INTO unconfirmed_alumni (
           profile_url,
           confidence_percentage,
           full_name,
@@ -169,41 +196,48 @@ class DatabaseService {
           university2,
           degree2
         ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28)
+        ON CONFLICT (profile_url) DO UPDATE SET
+          confidence_percentage = EXCLUDED.confidence_percentage,
+          full_name = EXCLUDED.full_name,
+          email = EXCLUDED.email,
+          phone_number = EXCLUDED.phone_number,
+          naf_track_certified = EXCLUDED.naf_track_certified
         RETURNING analyzer_id`,
-        [
-          record.profile_url,
-          record.confidence_percentage,
-          record.full_name,
-          record.email,
-          record.phone_number,
-          record.high_school,
-          record.hs_graduation_year,
-          record.naf_academy,
-          record.naf_track_certified,
-          record.address || null,
-          record.city || null,
-          record.state || null,
-          record.zip_code || null,
-          record.birthdate || null,
-          record.gender || null,
-          record.ethnicity || null,
-          record.military_branch_served || null,
-          record.current_job,
-          record.university_grad_year || null,
-          record.university || null,
-          record.degree || null,
-          record.school_district || null,
-          record.internship_company1 || null,
-          record.internship_end_date1 || null,
-          record.internship_company2 || null,
-          record.internship_end_date2 || null,
-          record.university2 || null,
-          record.degree2 || null,
-        ]
-      );
-      return result.rows[0]?.analyzer_id;
+          [
+            record.profile_url,
+            record.confidence_percentage,
+            record.full_name,
+            record.email,
+            record.phone_number,
+            record.high_school,
+            record.hs_graduation_year,
+            record.naf_academy,
+            record.naf_track_certified,
+            record.address,
+            record.city,
+            record.state,
+            record.zip_code,
+            record.birthdate,
+            record.gender,
+            record.ethnicity,
+            record.military_branch_served,
+            record.current_job,
+            record.university_grad_year,
+            record.university,
+            record.degree,
+            record.school_district,
+            record.internship_company1,
+            record.internship_end_date1,
+            record.internship_company2,
+            record.internship_end_date2,
+            record.university2,
+            record.degree2,
+          ]
+        );
+        return result.rows[0]?.analyzer_id ?? null;
+      }
     } catch (error) {
-      console.error("Error inserting unconfirmed_alumni record:", error);
+      console.error("Database operation failed:", error);
       return null;
     }
   }
