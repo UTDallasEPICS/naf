@@ -1,6 +1,5 @@
 {
     "extends": "@tsconfig/node22/tsconfig.json",
-    "type": "module",
     "compilerOptions": {
         "module": "NodeNext",
         "moduleResolution": "nodenext",
@@ -8,7 +7,8 @@
         "sourceMap": true,
         "esModuleInterop": true,
         "outDir": "dist",
-        "forceConsistentCasingInFileNames": true
+        "forceConsistentCasingInFileNames": true,
+        "allowSyntheticDefaultImports": true
     },
     "include": ["src/**/*"],
     "exclude": ["node_modules"]
