@@ -574,11 +574,11 @@ export const HIGH_SCHOOLS: HighSchool[] = [
 ];
 
 export const DEFAULT_WEIGHTS = {
-  highSchool: 0.25,
-  internship: 0.2,
-  currentJob: 0.15,
-  proximityUnder50mi: 0.1,
-  proximity50to100mi: 0.05,
+  highSchool: 0.476,
+  internship: 0.123,
+  currentJob: 0.0,
+  proximityUnder50mi: 0.268,
+  proximity50to100mi: 0.133,
 } as const;
 
 /*
