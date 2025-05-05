@@ -1,0 +1,19 @@
+{
+  "name": "analyzer",
+  "version": "1.0.0",
+  "main": "dist/main.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/main.js",
+    "dev": "ts-node src/main.ts",
+    "watch": "nodemon src/main.ts"
+  },
+  "devDependencies": {
+    "@types/node": "^18.0.0",
+    "@types/node-geocoder": "^4.2.6",
+    "typescript": "^5.0.0"
+  },
+  "dependencies": {
+    "node-geocoder": "^4.4.1"
+  }
+}
