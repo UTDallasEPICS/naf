@@ -10,6 +10,16 @@ services:
       - ./crawler:/app
     ports: []
     command: ["npm", "run", "start"]
+  analyzer:
+    build: analyzer/.
+    env_file:
+      - .env
+    image: naf_analyzer
+    container_name: naf_analyzer
+    working_dir: /app
+    volumes:
+      - ./analyzer:/app
+    command: ["npm", "run", "start"]
   pgadmin:
     image: dpage/pgadmin4
     container_name: naf_pgadmin
@@ -38,13 +48,3 @@ services:
 volumes:
   pgadmin-data:
   #pgdata:
-  analyzer:
-    build: analyzer/.
-    env_file:
-      - .env
-    image: naf_analyzer
-    container_name: naf_analyzer
-    working_dir: /app
-    volumes:
-      - ./analyzer:/app
-    command: ["npm", "run", "start"]
