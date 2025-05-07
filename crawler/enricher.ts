@@ -3,6 +3,10 @@ import chrome, { ServiceBuilder } from 'selenium-webdriver/chrome'; //we are sup
 import chromedriver from 'chromedriver';
 import { Client } from 'pg';
 import 'dotenv/config'; // get the dot env file
+import { EnricherLinkedInScraper } from './LinkedinScraper';
+import { ProfileData } from './html_json';
+import * as path from 'path';
+import * as fs from 'fs';
 
 const client = new Client({
     host: process.env.PGHOST,
@@ -11,8 +15,8 @@ const client = new Client({
     password: process.env.PGPASSWORD,
     database: process.env.PGDATABASE
   });
-
-  async function main(){
+// this is the function to try finding the person in cralwer database.
+  async function findInDb(){
     try{
 
         await client.connect();
@@ -74,7 +78,7 @@ const client = new Client({
             data.internshipCompany1    // internship_company1
           ]);
       
-          console.log(`Successfully enriched data for ${fullName}`);
+          console.log(`Successfully enriched data for ${fullName}`);  
 
     }
     catch (err) {
@@ -85,107 +89,144 @@ const client = new Client({
     }
   }
   
- main();
+ findInDb();
 
-const serviceBuilder = new chrome.ServiceBuilder(chromedriver.path);
-const Options = chrome.Options;    //The Chrome-specific configuration options you can pass to customize how Chrome runs when used with Selenium WebDriver.
 
-interface Person{
-    fullName: String;
+
+
+ const serviceBuilder = new chrome.ServiceBuilder(chromedriver.path);
+ const Options = chrome.Options;    //The Chrome-specific configuration options you can pass to customize how Chrome runs when used with Selenium WebDriver.
+ 
+ interface Person {
+    fullName: string;
     email?: string;
     phone?: string;
     school?: string;
-}
+    currentJob?: string;
+    city?: string;
+    highSchool?: string;
+    degree?: string;
+  }
 
-interface SearchResult {
+  interface SearchResult {
     items?: { link: string }[];
     error?: any;
   }
-const person: Person = {
-    fullName: 'Shahreen Iqbal',
-    email: 'singhbarkat1011@gmail.com',
-    phone: '',
-    school: 'University Of Texas, Dallas',
-}
+
+ /*   */
 
 
-async function findLinkedinProfile(person: Person): Promise<void> {
-    const { fullName, school } = person;
-    const [firstName, ...lastNameParts] = fullName.split(" ");
-    const lastName = lastNameParts.join(" ");
-
+  
+  async function findLinkedinProfile(person: Person): Promise<string | null> {
+    const { fullName, school, currentJob, city, highSchool, degree } = person;
+  
     const apiKey = process.env.API_KEY;
     const searchEngineId = process.env.SEARCH_ENGINE_ID;
-
+  
     if (!apiKey || !searchEngineId) {
-        console.error('API_KEY or SEARCH_ENGINE_ID not set in .env');
-        process.exit(1);
+      console.error('API_KEY or SEARCH_ENGINE_ID not set in .env');
+      process.exit(1);
     }
+  
+    let queryParts = [`site:linkedin.com/in "${fullName}"`];
+    if (school) queryParts.push(school);
+    if (currentJob) queryParts.push(currentJob);
+    if (city) queryParts.push(city);
+    if (highSchool) queryParts.push(highSchool);
+    if (degree) queryParts.push(degree); 
 
-    const queryVariations = [
-        `site:linkedin.com/in "${fullName}"`,
-        `site:linkedin.com/in "${firstName} ${lastName}"`,
-        school ? `site:linkedin.com/in "${fullName}" "${school}"` : '',
-        school ? `site:linkedin.com/in "${firstName} ${lastName}" "${school}"` : ''
-    ].filter(Boolean); // Remove empty strings
+const query = queryParts.join(" "); 
 
+  
+    const url = `https://www.googleapis.com/customsearch/v1?key=${apiKey}&cx=${searchEngineId}&q=${encodeURIComponent(query)}&num=5`;
+  
     const chromeOptions = new Options();
-    chromeOptions.addArguments(
-        '--headless=new',
-        '--disable-gpu',
-        '--no-sandbox',
-        '--disable-application-cache',
-        '--disable-extensions',
-        '--disable-notifications',
-        '--disable-setuid-sandbox',
-        '--disable-dev-shm-usage',
-        '--disk-cache-size=0',
-        '--media-cache-size=0',
-        '--aggressive-cache-discard'
-    );
-
+    chromeOptions.addArguments('--headless=new', '--disable-gpu', '--no-sandbox');
+  
     const driver = await new Builder()
-        .forBrowser('chrome')
-        .setChromeOptions(chromeOptions)
-        .setChromeService(serviceBuilder)
-        .build();
-
+      .forBrowser('chrome')
+      .setChromeOptions(chromeOptions)
+      .setChromeService(serviceBuilder)
+      .build();
+  
     try {
-        const allResults: any[] = [];
-        const seenUrls = new Set<string>();
-
-        for (const query of queryVariations) {
-            console.log(`Searching with query: ${query}`);
-            const url = `https://www.googleapis.com/customsearch/v1?key=${apiKey}&cx=${searchEngineId}&q=${encodeURIComponent(query)}&num=5&${Date.now()}`;
-
-            const data = await driver.executeAsyncScript(function (url: string, callback: Function) {
-                fetch(url)
-                    .then(res => res.json())
-                    .then(result => callback(result))
-                    .catch(err => callback({ error: err.toString() }));
-            }, url) as SearchResult;
-
-            const results = (data.items || []).filter((item: any) =>
-                item.link.includes('linkedin.com/in') && !seenUrls.has(item.link)
-            );
-
-            for (const result of results) {
-                seenUrls.add(result.link);
-                allResults.push(result);
-            }
-        }
-
-        if (allResults.length === 0) {
-            console.log('No LinkedIn profiles found.');
-        } else {
-            console.log(`Top LinkedIn Matches for "${fullName}":`);
-            allResults.forEach((item, index) => {
-                console.log(`${index + 1}. ${item.link}`);
-            });
-        }
+      const data = await driver.executeAsyncScript(function (url: string, callback: Function) {
+        fetch(url)
+          .then(res => res.json())
+          .then(result => callback(result))
+          .catch(err => callback({ error: err.toString() }));
+      }, url) as SearchResult;
+  
+      const results = (data.items || []).filter(item =>
+        item.link.includes('linkedin.com/in')
+      );
+  
+      if (results.length === 0) {
+        console.log(`No LinkedIn profiles found for "${fullName}".`);
+        return null;
+      } else {
+        console.log(`Top LinkedIn Matches for "${fullName}":`);
+        results.forEach((item, index) => {
+          console.log(`${index + 1}. ${item.link}`);
+        });
+        const firstProfileUrl = results[0].link;
+     
+        return firstProfileUrl;
+      }
     } finally {
-        await driver.quit();
+      await driver.quit();
     }
-}
-
-findLinkedinProfile(person).catch(console.error);
+    
+  }
+  
+  async function findOnLinkedin() {
+    try {
+      
+  
+      // 👇 change this to the person you want to test
+      const fullName = 'Luke Edwards';
+  
+      const res = await client.query(
+        `SELECT json FROM crawler_data WHERE json->>'fullName' = $1 LIMIT 1`,
+        [fullName]
+      );
+  
+      if (res.rows.length === 0) {
+        console.log(`No data found for ${fullName}`);
+        return;
+      }
+  
+      const data = res.rows[0].json;
+  
+      const person: Person = {
+        fullName: data.fullName,
+        email: data.email,
+        phone: data.phoneNumber,
+        school: data.university || data.highSchool,
+        currentJob: data.currentJob,
+        city: data.city,
+        highSchool: data.highSchool,
+        degree: data.degree,
+      };
+  
+      const profileUrl = await findLinkedinProfile(person);
+      if (!profileUrl) return;
+      // Initialize scraper and scrape the profile
+      const chromeOptions = new Options();
+    chromeOptions.addArguments('--headless=new', '--disable-gpu', '--no-sandbox');
+    const driver = await new Builder()
+    .forBrowser('chrome')
+    .setChromeOptions(chromeOptions)
+    .setChromeService(serviceBuilder)
+    .build();
+    
+    const scraper = new EnricherLinkedInScraper(driver);
+    await scraper.scrapeAndStoreProfile(profileUrl);
+    } catch (err) {
+      console.error('Error:', err);
+    } finally {
+      await client.end();
+    }
+  }
+  
+  findOnLinkedin().catch(console.error);
