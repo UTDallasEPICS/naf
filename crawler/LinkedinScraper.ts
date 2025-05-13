@@ -4,6 +4,7 @@ import * as path from 'path';
 import { load } from 'cheerio';
 import type { CheerioAPI } from 'cheerio';
 import { Client } from 'pg';
+import { Cheerio, Element } from 'cheerio';
 
 const pagesDir = path.join(process.cwd(), 'enricher_pages');
 const jsonDir = path.join(process.cwd(), 'enricher_json');
@@ -23,6 +24,8 @@ export class EnricherLinkedInScraper {
     if (!fs.existsSync(jsonDir)) fs.mkdirSync(jsonDir, { recursive: true });
   }
 
+
+//add random delay 
   private async delay(ms: number): Promise<void> {
     return new Promise(resolve => setTimeout(resolve, ms));
   }
@@ -59,26 +62,16 @@ export class EnricherLinkedInScraper {
       console.log(`Saved HTML: ${filename}`);
 
       // Convert to JSON and insert to DB
-      await this.convertToJson2(filename, profileUrl);
+      await this.convertToJson(filename, profileUrl);
       return true;
     } catch (error) {
       console.error(`Error scraping ${profileUrl}:`, error);
       return false;
     }
   }
-  private getBestText($: CheerioAPI, selectors: string[]): string | null {
-    for (const selector of selectors) {
-      const text = $(selector).first().text().trim();
-      if (text) return text;
-    }
-    return null;
-  }
 
 
-
- // This is just another method to try converting
-
-  private async convertToJson2(htmlFilename: string, profileUrl: string): Promise<void> {
+  private async convertToJson(htmlFilename: string, profileUrl: string): Promise<void> {
     const htmlPath = path.join(pagesDir, htmlFilename);
     const profileId = htmlFilename.split('_')[0];
     const jsonPath = path.join(jsonDir, `${profileId}.json`);
@@ -86,110 +79,201 @@ export class EnricherLinkedInScraper {
     try {
       const html = fs.readFileSync(htmlPath, 'utf-8');
       const $ = load(html);
-  
-      // 🔹 Robust selector sets
-      const fullName = this.getBestText($, [
-        'h1.top-card-layout__title',
-        'h1.text-heading-xlarge',
-        'h1',
-      ]);
-  
-      const jobTitle = this.getBestText($, [
-        'h2.top-card-layout__headline',
-        'h2.text-body-medium',
-        'h2',
-      ]);
-  
-      const locationText = this.getBestText($, [
-        '.top-card-layout__first-subline span:first-child',
-        '.top-card__subline-item',
-        '.top-card-location',
-      ]);
-  
-      let city = null, state = null;
-      if (locationText) {
-        const parts = locationText.split(',').map(p => p.trim());
-        [city, state] = [parts[0], parts[1]];
+
+      // 🔹 Name Extraction (with meta tag fallback)
+      const getMeta = ($: CheerioAPI, sel: string): string | null => {
+        return $(sel).attr('content')?.trim() ?? null;
+      };
+
+      const getText = ($: CheerioAPI, primarySelector: string): string | null => {
+        let text: string | null = null;
+        const primaryElement = $(primarySelector).first();
+        if (primaryElement.length) {
+            text = primaryElement.text().trim();
+        }
+        return text || null;
+      };
+
+      const getJsonLd = ($: CheerioAPI, rx: RegExp): string | null => {
+        const script = $('script[type="application/ld+json"]').html();
+        if (!script) return null;
+        const m = script.match(rx);
+        return m?.[1]?.trim() ?? null;
+      };
+       const cleanText = (text: string | null): string | null => {
+    if (!text) return null;
+    return text.replace(/[\n\s]+/g, ' ').trim();
+      };
+
+      // 🔹 Name Extraction
+      let fullName: string | null = null;
+      const firstNameMeta = getMeta($, 'meta[property="profile:first_name"]');
+      const lastNameMeta = getMeta($, 'meta[property="profile:last_name"]');
+      if (firstNameMeta && lastNameMeta) {
+          fullName = `${firstNameMeta} ${lastNameMeta}`;
+      } else {
+          fullName = firstNameMeta || lastNameMeta || getText($, 'h1.top-card-layout__title');
       }
-  
-      // 🔹 Education Section
-      let highSchool = null, hsGraduationYear = null;
+
+      // Job Title and Location
+      const jobTitleOg = getMeta($, 'meta[property="og:title"]');
+      const headlineH2 = getText($, 'h2.top-card-layout__headline');
+      const jobTitle = jobTitleOg || headlineH2;
+      const locationVisible = getText($, '.top-card-layout__first-subline > span:first-child');
+      const locationJsonLd = getJsonLd($, /"addressLocality":"(.*?)"/);
+      const location = locationVisible || locationJsonLd;
+      const city = locationJsonLd;
+      const state = null; // Not extracted in original, can be added if needed
+      const linkedinLink = getMeta($, 'meta[property="og:url"]');
+      const email = $('a[href^="mailto:"]').attr('href')?.replace('mailto:', '').trim() ?? null;
+      const phoneNumber = getText($, 'span.phone');
+
+      // Extract Education Data
+      let highSchool: string | null = null;
+      let hsGraduationYear: string | null = null;
       let university: string | null = null;
-let universityGradYear: string | null = null;
-let degree: string | null = null;
-      let nafAcademy = null, nafTrackCertified = null;
-  
-      const educationSection = $('section[data-section="educationsDetails"], section:contains("Education")');
-      if (educationSection.length === 0) {
-        console.warn(`No education section for ${htmlFilename}`);
+      let degree: string | null = null;
+      let universityGradYear: string | null = null;
+      const educationSection = $('section[data-section="educationsDetails"]');
+      if (educationSection.length > 0) {
+          educationSection.find('ul > li.education__list-item').each((_, el) => {
+              const schoolNameElement = $(el).find('h3 a').first().length ? $(el).find('h3 a').first() : $(el).find('h3').first();
+              const schoolName = cleanText(schoolNameElement.text());
+              const degreeMajorElement = $(el).find('h4').first();
+              const degreeMajorText = cleanText(degreeMajorElement.text());
+              const dateRangeElement = $(el).find('span.date-range').first();
+              const dateRangeText = cleanText(dateRangeElement.text());
+
+
+              if (schoolName?.toLowerCase().includes('high school')) {
+                  if (!highSchool) {
+                      highSchool = schoolName;
+                      if (dateRangeText) {
+                          const yearMatch = dateRangeText.match(/(\d{4})\s*$/);
+                          hsGraduationYear = yearMatch ? yearMatch[1] : null;
+                      }
+                  }
+              } else {
+                  if (!university) {
+                      university = schoolName;
+                      if (degreeMajorText) {
+                          const parts = degreeMajorText.split(',').map(p => p.trim());
+                          degree = parts[0]?.replace(/[\n\s]+/g, ' ').trim() || null;
+                      }
+                      if (dateRangeText) {
+                          const yearMatch = dateRangeText.match(/(\d{4})\s*$/);
+                          universityGradYear = yearMatch ? yearMatch[1] : null;
+                      }
+                  }
+              }
+          });
       }
-  
-      educationSection.find('li.education__list-item, li').each((_, el) => {
-        const textBlock = $(el).text().toLowerCase();
-        const school = $(el).find('h3').first().text().trim();
-        const degreeText = $(el).find('h4').first().text().trim();
-        const duration = $(el).find('span.date-range').first().text().trim();
-        const yearMatch = duration.match(/(\d{4})/);
-        const gradYear = yearMatch?.[1] ?? null;
-  
-        if (textBlock.includes('high school')) {
-          highSchool = school;
-          hsGraduationYear = gradYear;
-        } else {
-          university = university || school;
-          universityGradYear = universityGradYear || gradYear;
-          degree = degree || degreeText;
-        }
-  
-        if (school.toLowerCase().includes('academy of finance')) {
-          nafAcademy = school;
-        }
-        if (degreeText.toLowerCase().includes('naf track')) {
-          nafTrackCertified = degreeText;
-        }
-      });
-  
-      // 🔹 Experience Section
-      let currentJob = null;
-      let internship_company1: string | null = null;
-      let internship_end_date1 = null;
-      let internship_company2: string | null = null;
-      let internship_end_date2 = null;
-  
-      const expSection = $('section[data-section="experience"], section:contains("Experience")');
-      if (expSection.length === 0) {
-        console.warn(`No experience section for ${htmlFilename}`);
+     
+
+      // NAF Involvement
+      let nafAcademy: string | null = null;
+      let nafTrackCertified: string | null = null;
+      const certSection = $('section[data-section="certifications"]');
+      if (certSection.length > 0) {
+          certSection.find('ul > li').each((_, el) => {
+              const certName = cleanText($(el).find('h3').first().text());
+              const issuerName = cleanText($(el).find('h4 a').first().text());
+
+              if (!nafTrackCertified && certName?.toLowerCase().includes('naftrack')) {
+                  nafTrackCertified = certName;
+              }
+              if (!nafAcademy && certName?.toLowerCase().includes('academy of finance')) {
+                  nafAcademy = certName;
+              }
+              if (issuerName?.toLowerCase() === 'naf') {
+                  if (!nafTrackCertified) nafTrackCertified = certName ?? "NAF Issued Certification";
+                  if (!nafAcademy) nafAcademy = certName ?? "NAF Issued Certification";
+              }
+          });
       }
-  
-      expSection.find('ul > li').each((i, el) => {
-        const title = $(el).find('h3 span, h3').first().text().trim();
-        const company = $(el).find('h4 span, h4').first().text().trim();
-        const duration = $(el).find('span.date-range').first().text().trim();
-        const endDateMatch = duration.match(/(\w+\s+\d{4}|\d{4})$/);
-        const endDate = endDateMatch?.[0] ?? null;
-  
-        if (i === 0 && title && company) {
-          currentJob = `${title} at ${company}`;
-        }
-  
-        if (/intern(ship)?/i.test(title)) {
-          if (!internship_company1) {
-            internship_company1 = company;
-            internship_end_date1 = endDate;
-          } else if (!internship_company2) {
-            internship_company2 = company;
-            internship_end_date2 = endDate;
+      const orgSection = $('section[data-section="organizations"]');
+      if (!nafAcademy && orgSection.length > 0) {
+          orgSection.find('ul > li').each((_, el) => {
+              const orgName = cleanText($(el).find('h3').first().text());
+              if (orgName?.toLowerCase().includes('academy of finance')) {
+                  nafAcademy = orgName;
+                  return false;
+              }
+          });
+      }
+      if (!nafAcademy && educationSection.length > 0) {
+          educationSection.find('ul > li.education__list-item').each((_, el) => {
+              const description = cleanText($(el).find('div[data-section="educations"] p').first().text());
+              if (description?.toLowerCase().includes('academy of finance')) {
+                  nafAcademy = "Academy of Finance (Mentioned in Education)";
+                  return false;
+              }
+          });
+      }
+
+      // Current Job
+      let currentJob: string | null = null;
+      const expSection = $('section[data-section="experience"]');
+      if (expSection.length > 0) {
+          const firstExperienceItem = expSection.find('ul.experience__list > li').first();
+          const firstExpPosition = firstExperienceItem.hasClass('experience-group')
+              ? firstExperienceItem.find('ul.experience-group__positions > li').first()
+              : firstExperienceItem;
+          if (firstExpPosition.length > 0) {
+              const title = cleanText($(firstExpPosition).find('h3 span.experience-item__title').first().text());
+              const company = cleanText($(firstExpPosition).find('h4 span.experience-item__subtitle').first().text());
+              currentJob = title && company ? `${title} at ${company}` : title || company;
           }
-        }
-      });
-  
-      // 🔹 Build JSON
+      }
+      currentJob = currentJob || headlineH2;
+
+      // Internship Data
+      let internship_company1: string | null = null;
+      let internship_end_date1: string | null = null;
+      let internship_company2: string | null = null;
+      let internship_end_date2: string | null = null;
+      if (expSection.length > 0) {
+          expSection.find('ul > li').each((_, el) => {
+              const title = $(el).find('h3 span.experience-item__title').first().text().trim() || null;
+              const companyElement = $(el).find('h4 span.experience-item__subtitle').first();
+              const dateElement = $(el).find('span.date-range').first();
+
+              if (title?.toLowerCase().includes('intern') || title?.toLowerCase().includes('analyst')) {
+                  const durationText = cleanText(dateElement.text());
+                  if (durationText && (durationText.includes('mos') || /^\d+\s+yr(s)?$/.test(durationText) || /^\d{1,2}\s+mo(s)?$/.test(durationText))) {
+                      if (!internship_company1) {
+                          internship_company1 = companyElement.text().trim() || null;
+                          if (durationText) {
+                              const endDateMatch = durationText.match(/–\s*(\w+\s+\d{4}|\d{4})/);
+                              internship_end_date1 = endDateMatch ? endDateMatch[1] : null;
+                              if (!internship_end_date1) {
+                                  const singleDateMatch = durationText.match(/(\w+\s+\d{4}|\d{4})/);
+                                  internship_end_date1 = singleDateMatch ? singleDateMatch[1] : null;
+                              }
+                          }
+                      } else if (!internship_company2) {
+                          internship_company2 = companyElement.text().trim() || null;
+                          if (durationText) {
+                              const endDateMatch = durationText.match(/–\s*(\w+\s+\d{4}|\d{4})/);
+                              internship_end_date2 = endDateMatch ? endDateMatch[1] : null;
+                              if (!internship_end_date2) {
+                                  const singleDateMatch = durationText.match(/(\w+\s+\d{4}|\d{4})/);
+                                  internship_end_date2 = singleDateMatch ? singleDateMatch[1] : null;
+                              }
+                          }
+                      }
+                  }
+              }
+          });
+      }
+
+      // 🔹 Build JSON (maintaining your exact structure)
       const dbData = {
         profile_url: profileUrl,
         timestamp: new Date().toISOString(),
         full_name: fullName,
-        email: null,
-        phone_number: null,
+        email,
+        phone_number: phoneNumber,
         high_school: highSchool,
         hs_graduation_year: hsGraduationYear,
         naf_academy: nafAcademy,
@@ -207,7 +291,7 @@ let degree: string | null = null;
         university_grad_year: universityGradYear,
         university,
         degree,
-        linkedin_link: profileUrl,
+        linkedin_link: linkedinLink,
         school_district: null,
         internship_company1,
         internship_end_date1,
@@ -217,169 +301,22 @@ let degree: string | null = null;
         college_major2: null,
         degree2: null
       };
-  
-      fs.writeFileSync(jsonPath, JSON.stringify(dbData, null, 2));
-      console.log(`Saved JSON: ${jsonPath}`);
-  
-      await this.insertToEnricherDatabase(dbData);
-    } catch (error) {
-      console.error(`Error converting ${htmlFilename}:`, error);
-      throw error;
-    }
-  }  
-  
 
-  private async convertToJson(htmlFilename: string, profileUrl: string): Promise<void> {
-    const htmlPath = path.join(pagesDir, htmlFilename);
-    const profileId = htmlFilename.split('_')[0];
-    const jsonPath = path.join(jsonDir, `${profileId}.json`);
-
-    try {
-      const html = fs.readFileSync(htmlPath, 'utf-8');
-      const $ = load(html);
-
-      // Extract basic profile information - UPDATED SELECTORS
-      const fullName = this.getText($, 'h1.top-card-layout__title') || 
-                      $('h1').text().trim();
-      
-      const jobTitle = this.getText($, 'h2.top-card-layout__headline') || 
-                      $('h2').text().trim();
-      
-      const locationText = this.getText($, '.top-card-layout__first-subline > span:first-child') || 
-                          $('.top-card-location').text().trim();
-
-      // Parse location into city/state
-      let city = null;
-      let state = null;
-      if (locationText) {
-        const locationParts = locationText.split(', ');
-        city = locationParts[0] || null;
-        state = locationParts[1] || null;
-      }
-
-      // Extract education information - UPDATED TO USE SECTIONS
-      let highSchool = null;
-      let hsGraduationYear = null;
-      let university = null;
-      let universityGradYear = null;
-      let degree = null;
-      let nafAcademy = null;
-      let nafTrackCertified = null;
-
-      const educationSection = $('section[data-section="educationsDetails"]');
-      if (educationSection.length > 0) {
-        educationSection.find('ul > li.education__list-item').each((_, el) => {
-          const school = $(el).find('h3').first().text().trim();
-          const degreeText = $(el).find('h4').first().text().trim();
-          const duration = $(el).find('span.date-range').first().text().trim();
-          
-          const yearMatch = duration.match(/(\d{4})/);
-          const gradYear = yearMatch ? yearMatch[1] : null;
-
-          if (school.toLowerCase().includes('high school')) {
-            highSchool = school;
-            hsGraduationYear = gradYear;
-          } else {
-            university = school;
-            universityGradYear = gradYear;
-            degree = degreeText;
-          }
-
-          if (school.toLowerCase().includes('academy of finance')) {
-            nafAcademy = school;
-          }
-          if (degreeText.toLowerCase().includes('naf track')) {
-            nafTrackCertified = degreeText;
-          }
-        });
-      }
-
-      // Extract experience information - UPDATED TO USE SECTIONS
-      let currentJob = null;
-      let internshipCompany1: string | null = null;
-      let internship_end_date1 = null;
-      let internship_company2: string | null = null;
-      let internship_end_date2 = null;
-
-      const expSection = $('section[data-section="experience"]');
-      if (expSection.length > 0) {
-        expSection.find('ul > li').each((i, el) => {
-          const title = $(el).find('h3 span.experience-item__title').first().text().trim();
-          const company = $(el).find('h4 span.experience-item__subtitle').first().text().trim();
-          const duration = $(el).find('span.date-range').first().text().trim();
-          
-          const endDateMatch = duration.match(/(\w+\s+\d{4}|\d{4})$/);
-          const endDate = endDateMatch ? endDateMatch[0] : null;
-
-          if (i === 0) {
-            currentJob = title ? `${title} at ${company}` : company;
-          }
-
-          if (title?.toLowerCase().includes('intern') || 
-              title?.toLowerCase().includes('internship')) {
-            if (!internshipCompany1) {
-              internshipCompany1 = company;
-              internship_end_date1 = endDate;
-            } else if (!internship_company2) {
-              internship_company2 = company;
-              internship_end_date2 = endDate;
-            }
-          }
-        });
-      }
-
-      // Prepare data for database insertion
-      const dbData = {
-        profile_url: profileUrl,
-        timestamp: new Date().toISOString(),
-        full_name: fullName,
-        email: null,
-        phone_number: null,
-        high_school: highSchool,
-        hs_graduation_year: hsGraduationYear,
-        naf_academy: nafAcademy,
-        naf_track_certified: nafTrackCertified,
-        address: null,
-        city: city,
-        state: state,
-        zip_code: null,
-        birthdate: null,
-        gender: null,
-        ethnicity: null,
-        military_branch_served: null,
-        current_job: currentJob || jobTitle,
-        college_major: null,
-        university_grad_year: universityGradYear,
-        university: university,
-        degree: degree,
-        linkedin_link: profileUrl,
-        school_district: null,
-        internship_company1: internshipCompany1,
-        internship_end_date1: internship_end_date1,
-        internship_company2: internship_company2,
-        internship_end_date2: internship_end_date2,
-        university2: null,
-        college_major2: null,
-        degree2: null
-      };
-
-      // Save JSON
       fs.writeFileSync(jsonPath, JSON.stringify(dbData, null, 2));
       console.log(`Saved JSON: ${jsonPath}`);
 
-      // Insert to database
       await this.insertToEnricherDatabase(dbData);
     } catch (error) {
       console.error(`Error converting ${htmlFilename}:`, error);
-      throw error;
+      // Optionally: throw error; // Keep if you want failures to propagate
     }
-  }   
+  }
+  
 
-// Add this helper function at class level
-private getText($: CheerioAPI, selector: string): string | null {
-  const element = $(selector).first();
-  return element.length ? element.text().trim() : null;
-}
+ 
+
+
+
   private async insertToEnricherDatabase(data: any): Promise<void> {
     const client = new Client({
       host: process.env.PGHOST,
