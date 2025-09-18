@@ -7,8 +7,8 @@ COPY tsconfig.json ./
 
 RUN npm install
 
-COPY src/ ./src/
+# COPY src/ ./src/
 
-RUN npm run build
+# RUN npm run build
 
 CMD ["npm", "run", "start"]
