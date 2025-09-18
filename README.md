@@ -49,7 +49,7 @@ The **NAF Alumni Tracking System** is a web-scraping project intended to automat
   - **Selenium Webdriver**: Used for browser automation adn interacting with web pages to scrape LinkedIn profiles.
   - **Cheerio**: Used for parsing HTML content extracted from LinkedIN profiles to JSON.
 - **Database**:
-  - **PosgreSQL**: ALumni data is stored in a PostgreSQL database in JSON structured format
+  - **PostgreSQL**: ALumni data is stored in a PostgreSQL database in JSON structured format
   - **pg(Node.js PostgreSQL client)**: Used to connect to and interact with the PostgreSQL database.
 - **Enviornment Management**: ```dotenv```: Used to load environment variables (e.g., API keys, databse credentials) from a ```.env``` file.
 

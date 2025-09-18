@@ -3,8 +3,8 @@
   "version": "1.0.0",
   "main": "dist/main.js",
   "scripts": {
-    "build": "tsc",
-    "start": "node dist/main.js",
+    "build": "tsc && node dist/main.js",
+    "start": "npm install && tsc && node dist/main.js",
     "dev": "ts-node src/main.ts",
     "watch": "nodemon src/main.ts"
   },
