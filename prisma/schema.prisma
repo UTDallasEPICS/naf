@@ -1,0 +1,121 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model confirmed_alumni {
+  analyzer_id            Int       @id @default(autoincrement())
+  profile_url            String?
+  confidence_percentage  Float?    @db.Real
+  full_name              String?
+  email                  String?
+  phone_number           String?
+  high_school            String?
+  hs_graduation_year     String?
+  naf_academy            String?
+  naf_track_certified    String?
+  address                String?
+  city                   String?
+  state                  String?
+  zip_code               String?
+  birthdate              DateTime? @db.Date
+  gender                 String?
+  ethnicity              String?
+  military_branch_served String?
+  current_job            String?
+  college_major          String?
+  university_grad_year   String?
+  university             String?
+  degree                 String?
+  linkedin_link          String?
+  school_district        String?
+  internship_company1    String?
+  internship_end_date1   DateTime? @db.Date
+  internship_company2    String?
+  internship_end_date2   DateTime? @db.Date
+  university2            String?
+  college_major2         String?
+  degree2                String?
+}
+
+model crawler_data {
+  crawler_id  Int       @id @default(autoincrement())
+  created_at  DateTime? @default(now()) @db.Timestamp(6)
+  profile_url String?
+  json        Json?
+}
+
+model enricher_data {
+  enricher_id            Int       @id @default(autoincrement())
+  profile_url            String?
+  timestamp              DateTime? @db.Timestamp(6)
+  full_name              String?
+  email                  String?
+  phone_number           String?
+  high_school            String?
+  hs_graduation_year     String?
+  naf_academy            String?
+  naf_track_certified    String?
+  address                String?
+  city                   String?
+  state                  String?
+  zip_code               String?
+  birthdate              DateTime? @db.Date
+  gender                 String?
+  ethnicity              String?
+  military_branch_served String?
+  current_job            String?
+  college_major          String?
+  university_grad_year   String?
+  university             String?
+  degree                 String?
+  linkedin_link          String?
+  school_district        String?
+  internship_company1    String?
+  internship_end_date1   DateTime? @db.Date
+  internship_company2    String?
+  internship_end_date2   DateTime? @db.Date
+  university2            String?
+  college_major2         String?
+  degree2                String?
+}
+
+model unconfirmed_alumni {
+  analyzer_id            Int       @id @default(autoincrement())
+  profile_url            String?
+  confidence_percentage  Float?    @db.Real
+  full_name              String?
+  email                  String?
+  phone_number           String?
+  high_school            String?
+  hs_graduation_year     String?
+  naf_academy            String?
+  naf_track_certified    String?
+  address                String?
+  city                   String?
+  state                  String?
+  zip_code               String?
+  birthdate              DateTime? @db.Date
+  gender                 String?
+  ethnicity              String?
+  military_branch_served String?
+  current_job            String?
+  college_major          String?
+  university_grad_year   String?
+  university             String?
+  degree                 String?
+  linkedin_link          String?
+  school_district        String?
+  internship_company1    String?
+  internship_end_date1   DateTime? @db.Date
+  internship_company2    String?
+  internship_end_date2   DateTime? @db.Date
+  university2            String?
+  college_major2         String?
+  degree2                String?
+}
