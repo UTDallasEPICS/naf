@@ -3,3 +3,10 @@ dist
 .env
 pages
 data_json
+/generated/prisma
+
+# Ignore SQLite dev database
+prisma/dev.db
+prisma/prisma/dev.db
+*.db-journal
+
