@@ -1,30 +1,49 @@
+version: "3.9"
+
 services:
   crawler:
-    build: crawler/.
+    build: ./crawler
     platform: linux/amd64
     env_file:
       - .env
     container_name: naf_crawler
     volumes:
       - ./crawler:/app
-    ports: []
+    # ports: []  # no ports needed
+
   analyzer:
-    build: analyzer/.
+    build: ./analyzer
     platform: linux/amd64
     env_file:
       - .env
     container_name: naf_analyzer
     volumes:
       - ./analyzer:/app
+
+  naf_db:
+    image: postgres:15
+    container_name: naf_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: epics
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: postgres
+    ports:
+      - "5432:5432"   # change to "5433:5432" if 5432 is busy
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
   pgadmin:
     image: dpage/pgadmin4
     container_name: naf_pgadmin
-    restart: always
-    ports:
-      - "8888:80"
+    restart: unless-stopped
     environment:
       PGADMIN_DEFAULT_EMAIL: epics@epics.com
       PGADMIN_DEFAULT_PASSWORD: password
+    ports:
+      - "8888:80"
+    depends_on:
+      - naf_db
     volumes:
       - pgadmin-data:/var/lib/pgadmin
   naf_db:
