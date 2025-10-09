@@ -36,25 +36,31 @@ The **NAF Alumni Tracking System** is a web-scraping project intended to automat
 
 ## Third Party Integrations
 - **Google Custom Search API:**
-  - Used to find LinkedIn profiles based on search queries. The API key and Search Engine ID are required and managed via environment variables as show in ```env.example```.
-- **Amazon Web Service:**
-  - Used to asynchronusly run the crawler to have mass amounts of data in the databased **(Has not been set up yet)**
+  - Used to find LinkedIn profiles based on search queries. The API key and Search Engine ID are required and managed via environment variables as show in `env.example`.
+- **Amazon Web Services:**
+  - Used to asynchronusly run the crawler to have mass amounts of data in the database **(Has not been set up yet)**
 - **PgAdmin**
   - Used to manage the database using a admin account where every JSON file is stored 
 
 ## Technology Stack
-- **Language**: Typescript
-- **Runtime Environment**: Node.js (implied by Typescript usage)
+- **Language**: TypeScript
+- **Runtime Environment**: Node.js (implied by TypeScript usage)
 - **Web Scraping & Automation**:
   - **Selenium Webdriver**: Used for browser automation adn interacting with web pages to scrape LinkedIn profiles.
   - **Cheerio**: Used for parsing HTML content extracted from LinkedIN profiles to JSON.
 - **Database**:
-  - **PostgreSQL**: ALumni data is stored in a PostgreSQL database in JSON structured format
-  - **pg(Node.js PostgreSQL client)**: Used to connect to and interact with the PostgreSQL database.
-- **Enviornment Management**: ```dotenv```: Used to load environment variables (e.g., API keys, databse credentials) from a ```.env``` file.
+  - **PostgreSQL**: Alumni data is stored in a PostgreSQL database in JSON structured format
+  - **pg (Node.js PostgreSQL client)**: Used to connect to and interact with the PostgreSQL database.
+- **Enviornment Management**: `dotenv`: Used to load environment variables (e.g., API keys, database credentials) from a `.env` file.
 
 ## Setting Up Development Environment
-- Git clone ```https://github.com/UTDallasEPICS/naf.git```
-- ```npm install``` (If there is a error stating File ``` '@tsconfig/node22/tsconfig.json' ``` not found, make sure to update to Node 22 and also run the command ``` npm install -D @tsconfig/node22 ```)
-- Set Up Environment Variables as show in ```env.example```. (This also includes the database login and access)
-- Install Docker Client and run ```docker compose up``` in the root directory
+- Install [git](https://git-scm.com/downloads), [Node.js](https://nodejs.org/en/download) 22 or higher, and [Docker Desktop](https://www.docker.com/products/docker-desktop/) on your computer.
+- In a terminal:
+  - Run `git clone https://github.com/UTDallasEPICS/naf.git` to clone the repository.
+  - Run `cd analyzer` and `npm install` to install dependencies for the analyzer project. 
+    - If there is a error stating File `'@tsconfig/node22/tsconfig.json'` not found, make sure to update to Node 22 and also run the command `npm install -D @tsconfig/node22`
+  - Run `cd ..` to change directory out of the analyzer, then run `cd crawler` and `npm install` to install dependencies for the crawler project. 
+- Make a copy of the file `.env.example` and rename it to `.env`.
+- Fill out the variables in the `.env`. file using the directions in the comments.
+  - These variables are used by the code to configure database access and credentials to access the Google Search API. 
+- Run `docker compose up` in the root directory to run the analyzer, crawler, and a pgAdmin instance (a tool allowing you to inspect a PostgreSQL database visually).
