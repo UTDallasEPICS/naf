@@ -5,3 +5,4 @@ package-lock.json		\naf\crawler\package-lock.json
 package.json			\naf\crawler\package.json
 linkedinScraper.ts		\naf\crawler\src\linkedinScraper.ts
 main.ts				\naf\crawler\src\main.ts
+main.json           \naf\crawler\dist\main.js
