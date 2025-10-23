@@ -17,7 +17,7 @@ export default defineEventHandler(async (event) => {
   const body = await readBody(event);
 
   // Only allow model fields to be updated
-  const allowedFields = [
+  const allowedFields: string[] = [
     "profile_url",
     "confidence_percentage",
     "full_name",
@@ -49,13 +49,13 @@ export default defineEventHandler(async (event) => {
     "university2",
     "college_major2",
     "degree2",
-  ] as const;
+  ];
 
-  const dateFields = new Set([
+  const dateFields: string[] = [
     "birthdate",
     "internship_end_date1",
     "internship_end_date2",
-  ]);
+  ];
 
   const data: Record<string, any> = {};
   let hasAny = false;
@@ -66,7 +66,7 @@ export default defineEventHandler(async (event) => {
 
     const val = (body as any)[key];
 
-    if (dateFields.has(key)) {
+    if (dateFields.includes(key)) {
       if (val === null || val === undefined || val === "") {
         data[key] = null;
       } else {

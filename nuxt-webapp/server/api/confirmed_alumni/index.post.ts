@@ -8,7 +8,7 @@ export default defineEventHandler(async (event) => {
   const body = await readBody(event);
 
   // Accept only schema fields; coerce known DateTime/Float fields
-  const allowedFields = [
+  const allowedFields: string[] = [
     "profile_url",
     "confidence_percentage",
     "full_name",
@@ -40,19 +40,19 @@ export default defineEventHandler(async (event) => {
     "university2",
     "college_major2",
     "degree2",
-  ] as const;
+  ];
 
-  const dateFields = new Set<keyof typeof body>([
+  const dateFields: string[] = [
     "birthdate",
     "internship_end_date1",
     "internship_end_date2",
-  ]);
+  ];
 
   const data: Record<string, any> = {};
   for (const key of allowedFields) {
     if (body[key] === undefined) continue;
 
-    if (dateFields.has(key)) {
+    if (dateFields.includes(key)) {
       // Allow ISO string or Date; reject bad dates
       const d = body[key] instanceof Date ? body[key] : new Date(body[key]);
       if (Number.isNaN(d.getTime())) {

@@ -1,7 +1,8 @@
 import { defineEventHandler, setResponseStatus, getRouterParam, readBody } from "h3";
 
+// PUT /api/unconfirmed_alumni/:analyzer_id
 export default defineEventHandler(async (event) => {
-  const prisma = event.context.prisma as any; // PrismaClient attached via plugin
+  const prisma = event.context.prisma as any;
   const idParam = getRouterParam(event, "analyzer_id") ?? getRouterParam(event, "id");
   const analyzerId = Number(idParam);
 
@@ -16,8 +17,7 @@ export default defineEventHandler(async (event) => {
 
   const body = await readBody(event);
 
-  // Only allow model fields to be updated
-  const allowedFields = [
+  const allowedFields: string[] = [
     "profile_url",
     "confidence_percentage",
     "full_name",
@@ -49,28 +49,28 @@ export default defineEventHandler(async (event) => {
     "university2",
     "college_major2",
     "degree2",
-  ] as const;
+  ];
 
-  const dateFields = new Set([
+  const dateFields: string[] = [
     "birthdate",
     "internship_end_date1",
     "internship_end_date2",
-  ]);
+  ];
 
   const data: Record<string, any> = {};
   let hasAny = false;
 
   for (const key of allowedFields) {
-    if (!(key in body)) continue; // skip fields not provided
+    if (!(key in body)) continue;
     hasAny = true;
 
-    const val = (body as any)[key];
+    const val = body[key as keyof typeof body];
 
-    if (dateFields.has(key)) {
+    if (dateFields.includes(key)) {
       if (val === null || val === undefined || val === "") {
         data[key] = null;
       } else {
-        const d = val instanceof Date ? val : new Date(val);
+        const d = val instanceof Date ? val : new Date(val as any);
         if (Number.isNaN(d.getTime())) {
           setResponseStatus(event, 400);
           return { success: false, error: `Invalid date for '${key}'. Use ISO-8601.` };
@@ -81,7 +81,7 @@ export default defineEventHandler(async (event) => {
       if (val === null || val === undefined || val === "") {
         data[key] = null;
       } else {
-        const f = typeof val === "number" ? val : Number(val);
+        const f = typeof val === "number" ? val : Number(val as any);
         if (Number.isNaN(f)) {
           setResponseStatus(event, 400);
           return { success: false, error: "confidence_percentage must be a number." };
@@ -89,20 +89,17 @@ export default defineEventHandler(async (event) => {
         data[key] = f;
       }
     } else {
-      data[key] = val; // strings/nullable strings
+      data[key] = val;
     }
   }
 
   if (!hasAny) {
     setResponseStatus(event, 400);
-    return {
-      success: false,
-      error: "Provide at least one field to update.",
-    };
+    return { success: false, error: "Provide at least one field to update." };
   }
 
   try {
-    const updated = await prisma.confirmed_alumni.update({
+    const updated = await prisma.unconfirmed_alumni.update({
       where: { analyzer_id: analyzerId },
       data,
     });
@@ -111,12 +108,8 @@ export default defineEventHandler(async (event) => {
     return { success: true, data: updated };
   } catch (error: any) {
     if (error?.code === "P2025") {
-      // Prisma: record not found
       setResponseStatus(event, 404);
-      return {
-        success: false,
-        error: `No confirmed_alumni found with analyzer_id=${analyzerId}`,
-      };
+      return { success: false, error: `No unconfirmed_alumni found with analyzer_id=${analyzerId}` };
     }
     const msg = error instanceof Error ? error.message : "Unknown error occurred";
     setResponseStatus(event, 500);
