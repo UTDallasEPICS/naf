@@ -1,4 +1,10 @@
-import puppeteer from 'puppeteer';
+import puppeteer from 'puppeteer-extra';
+
+import StealthPlugin from 'puppeteer-extra-plugin-stealth';
+
+// Apply the stealth plugin
+puppeteer.use(StealthPlugin());
+
 
 // Arguments to be used in the url
 export type RequestNamesArgs = {
@@ -18,7 +24,7 @@ const constants = {
 
 // 
 export async function puppeteerRequestNames(args: RequestNamesArgs){
-    const browser = await puppeteer.launch({args: ["--no-sandbox", "--disable-setuid-sandbox"]});
+    const browser = await puppeteer.launch({args: ["--no-sandbox", "--disable-setuid-sandbox"], headless: true, devtools: true});
     const page = await browser.newPage();
     const searchParams = new URLSearchParams();
 
@@ -31,14 +37,21 @@ export async function puppeteerRequestNames(args: RequestNamesArgs){
     //searchParams.set("count", `${constants.ancestryResultCountPerRequest}`);
     //searchParams.set("collections", constants.usYearbookAncestryCollection);
 
-    const url = `https://www.ancestry.com/search/collections/1265/?${searchParams.toString()}`;
+    const url = `https://www.ancestry.com/search/collections/${constants.usYearbookAncestryCollection}/?${searchParams.toString()}`;
+    
     console.log("Accessing url: ", { url });
     await page.goto(url);
     await page.setViewport({ width: 1080, height: 1024 });
 
-    const id='td[id="resultItem-0"]';
-    const name = await page.locator(id).waitHandle();
-    console.log("Page Locator Details: \n", name);
+    const html = await page.content()
+    console.log(html)
+    const tableRowSelector='tbody > tr';
+
+    const fullNameList = await page.$$eval(tableRowSelector, nodes =>
+      nodes.map(n => (n.children[1] as HTMLElement).innerText),
+    );
+    
+    console.log(fullNameList)
     
     await browser.close();
 }
@@ -58,5 +71,3 @@ export type BulkRequestNamesArgs = Omit<RequestNamesArgs, "page"> & {
 };
 
 
-
-// run();
