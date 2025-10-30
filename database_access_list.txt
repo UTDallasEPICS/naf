@@ -1,35 +1,36 @@
+
 1. analyzer/dist/database.js
    - Connects to PostgreSQL using the pg library.
    - Handles:
-       • connect() and disconnect() sessions
-       • fetchProfiles(limit, offset) → SELECT from crawler_data
-       • fetchProfileById(id) → SELECT from crawler_data
-       • fetchExistingRecord(profileUrl) → SELECT from unconfirmed_alumni
-       • insertUnconfirmedAnalyzerRecord(record) → INSERT / UPDATE unconfirmed_alumni
+       - connect() and disconnect() sessions
+       - fetchProfiles(limit, offset) → SELECT from crawler_data
+       - fetchProfileById(id) → SELECT from crawler_data
+       - fetchExistingRecord(profileUrl) → SELECT from unconfirmed_alumni
+       - insertUnconfirmedAnalyzerRecord(record) → INSERT / UPDATE unconfirmed_alumni
    - Tables Accessed:
-       • crawler_data
-       • unconfirmed_alumni
-       • confirmed_alumni (future use)
+       - crawler_data
+       - unconfirmed_alumni
+       - confirmed_alumni (future use)
    - Action Types: READ / WRITE / UPDATE
 
 2. analyzer/dist/main.js
    - Calls functions from database.js to perform analysis storage.
    - Sequence:
-       • Reads profiles using fetchProfiles()
-       • Checks duplicates with fetchExistingRecord()
-       • Inserts new analyzed results using insertUnconfirmedAnalyzerRecord()
+       - Reads profiles using fetchProfiles()
+       - Checks duplicates with fetchExistingRecord()
+       - Inserts new analyzed results using insertUnconfirmedAnalyzerRecord()
    - Tables Accessed:
-       • crawler_data
-       • unconfirmed_alumni
+       - crawler_data
+       - unconfirmed_alumni
    - Action Types: READ / WRITE
 
 3. prisma/schema.prisma
    - Defines structure and relationships of the database models.
    - Models/Tables:
-       • confirmed_alumni
-       • unconfirmed_alumni
-       • crawler_data
-       • enricher_data
+       -confirmed_alumni
+       - unconfirmed_alumni
+       - crawler_data
+       - enricher_data
    - Used by Prisma ORM for schema migrations and client generation.
    - Action Type: Definition / Configuration
 
