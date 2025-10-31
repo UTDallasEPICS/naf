@@ -1,6 +1,6 @@
 import fs from 'node:fs/promises';
 import { bulkRequestNamesFromAncestry, type RequestNamesArgs } from './request-names-from-ancestry';
-import { puppeteerRequestNames } from './request-ancestry-puppeteer';
+import { /*bulkRequestNamesFromAncestry, */puppeteerRequestNames } from './request-ancestry-puppeteer';
 
 const sampleRequestArgs: RequestNamesArgs = {
   year: 1991,
@@ -13,9 +13,9 @@ const sampleRequestArgs: RequestNamesArgs = {
 
 
 async function testAncestry() {
-  const results = (await puppeteerRequestNames({
+  const results = (await bulkRequestNamesFromAncestry({
       ...sampleRequestArgs,
-      //fetch: { pageLimit: 50, mode: "limited" },
+      fetch: { pageLimit: 10, mode: "limited" },
       // fetch: { mode: "unlimited" },
     })
   );
