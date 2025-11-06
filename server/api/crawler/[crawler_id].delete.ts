@@ -1,8 +1,9 @@
 import { defineEventHandler, setResponseStatus, getRouterParam } from "h3";
+import { PrismaClient } from "@prisma/client";
 
 // DELETE /api/crawler_data/:crawler_id
 export default defineEventHandler(async (event) => {
-  const prisma = event.context.prisma as any;
+  const prisma = new PrismaClient() as any;
   const idParam = getRouterParam(event, "crawler_id") ?? getRouterParam(event, "id");
   const crawlerId = Number(idParam);
 

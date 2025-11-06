@@ -1,7 +1,9 @@
 import { defineEventHandler, setResponseStatus, getRouterParam } from "h3";
+import { PrismaClient } from "@prisma/client";
 
+// DELETE /api/unconfirmed_alumni/:analyzer_id
 export default defineEventHandler(async (event) => {
-  const prisma = event.context.prisma as any; // PrismaClient attached via plugin
+  const prisma = new PrismaClient() as any;
   const idParam = getRouterParam(event, "analyzer_id") ?? getRouterParam(event, "id");
   const analyzerId = Number(idParam);
 
@@ -15,31 +17,30 @@ export default defineEventHandler(async (event) => {
   }
 
   try {
-    // Optional existence check for a cleaner 404
-    const existing = await prisma.confirmed_alumni.findUnique({
+    const existing = await prisma.unconfirmed_alumni.findUnique({
       where: { analyzer_id: analyzerId },
       select: { analyzer_id: true },
     });
 
     if (!existing) {
       setResponseStatus(event, 404);
-      return { success: false, error: "confirmed_alumni not found" };
+      return { success: false, error: "unconfirmed_alumni not found" };
     }
 
-    await prisma.confirmed_alumni.delete({
+    await prisma.unconfirmed_alumni.delete({
       where: { analyzer_id: analyzerId },
     });
 
     setResponseStatus(event, 200);
     return {
       success: true,
-      message: "confirmed_alumni deleted successfully",
+      message: "unconfirmed_alumni deleted successfully",
       id: analyzerId,
     };
   } catch (error: any) {
     if (error?.code === "P2025") {
       setResponseStatus(event, 404);
-      return { success: false, error: "confirmed_alumni not found" };
+      return { success: false, error: "unconfirmed_alumni not found" };
     }
     const msg = error instanceof Error ? error.message : "Unknown error occurred";
     setResponseStatus(event, 500);

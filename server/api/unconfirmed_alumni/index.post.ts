@@ -1,13 +1,14 @@
 import { defineEventHandler, readBody, setResponseStatus } from "h3";
+import { PrismaClient } from "@prisma/client";
 
-// POST /api/enricher_data
+// POST /api/unconfirmed_alumni
 export default defineEventHandler(async (event) => {
-  const prisma = event.context.prisma as any;
+  const prisma = new PrismaClient() as any;
   const body = await readBody(event);
 
   const allowedFields: string[] = [
     "profile_url",
-    "timestamp",
+    "confidence_percentage",
     "full_name",
     "email",
     "phone_number",
@@ -40,7 +41,6 @@ export default defineEventHandler(async (event) => {
   ];
 
   const dateFields: string[] = [
-    "timestamp",
     "birthdate",
     "internship_end_date1",
     "internship_end_date2",
@@ -52,28 +52,31 @@ export default defineEventHandler(async (event) => {
 
     const val = body[key];
     if (dateFields.includes(key)) {
-      if (val === null || val === "") {
-        data[key] = null;
-      } else {
-        const d = val instanceof Date ? val : new Date(val);
-        if (Number.isNaN(d.getTime())) {
-          setResponseStatus(event, 400);
-          return { success: false, error: `Invalid date for '${key}'. Use ISO-8601.` };
-        }
-        data[key] = d;
+      const d = val instanceof Date ? val : new Date(val);
+      if (Number.isNaN(d.getTime())) {
+        setResponseStatus(event, 400);
+        return { success: false, error: `Invalid date for '${key}'. Use ISO-8601.` };
       }
+      data[key] = d;
+    } else if (key === "confidence_percentage") {
+      const f = typeof val === "number" ? val : Number(val);
+      if (Number.isNaN(f)) {
+        setResponseStatus(event, 400);
+        return { success: false, error: "confidence_percentage must be a number." };
+      }
+      data[key] = f;
     } else {
       data[key] = val;
     }
   }
 
   try {
-    const created = await prisma.enricher_data.create({ data });
+    const created = await prisma.unconfirmed_alumni.create({ data });
     setResponseStatus(event, 201);
     return { success: true, data: created };
   } catch (error) {
     const msg = error instanceof Error ? error.message : "Unknown error occurred";
     setResponseStatus(event, 500);
-    return { success: false, error: `Error creating enricher_data: ${msg}` };
+    return { success: false, error: `Error creating unconfirmed_alumni: ${msg}` };
   }
 });

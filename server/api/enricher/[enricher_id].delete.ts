@@ -1,8 +1,9 @@
 import { defineEventHandler, setResponseStatus, getRouterParam } from "h3";
+import { PrismaClient } from "@prisma/client";
 
-// GET /api/enricher_data/:enricher_id
+// DELETE /api/enricher_data/:enricher_id
 export default defineEventHandler(async (event) => {
-  const prisma = event.context.prisma as any;
+  const prisma = new PrismaClient() as any;
   const idParam = getRouterParam(event, "enricher_id") ?? getRouterParam(event, "id");
   const enricherId = Number(idParam);
 
@@ -16,18 +17,31 @@ export default defineEventHandler(async (event) => {
   }
 
   try {
-    const row = await prisma.enricher_data.findUnique({
+    const existing = await prisma.enricher_data.findUnique({
+      where: { enricher_id: enricherId },
+      select: { enricher_id: true },
+    });
+
+    if (!existing) {
+      setResponseStatus(event, 404);
+      return { success: false, error: "enricher_data not found" };
+    }
+
+    await prisma.enricher_data.delete({
       where: { enricher_id: enricherId },
     });
 
-    if (!row) {
-      setResponseStatus(event, 404);
-      return { success: false, error: `No enricher_data found with enricher_id=${enricherId}` };
-    }
-
     setResponseStatus(event, 200);
-    return { success: true, data: row };
-  } catch (error) {
+    return {
+      success: true,
+      message: "enricher_data deleted successfully",
+      id: enricherId,
+    };
+  } catch (error: any) {
+    if (error?.code === "P2025") {
+      setResponseStatus(event, 404);
+      return { success: false, error: "enricher_data not found" };
+    }
     const msg = error instanceof Error ? error.message : "Unknown error occurred";
     setResponseStatus(event, 500);
     return { success: false, error: msg };

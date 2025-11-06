@@ -1,8 +1,9 @@
 import { defineEventHandler, readBody, setResponseStatus } from "h3";
+import { PrismaClient } from "@prisma/client";
 
 // POST /api/crawler_data
 export default defineEventHandler(async (event) => {
-  const prisma = event.context.prisma as any;
+  const prisma = new PrismaClient();
   const body = await readBody(event);
 
   const data: Record<string, any> = {};

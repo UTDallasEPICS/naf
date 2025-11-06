@@ -1,25 +1,26 @@
 import { defineEventHandler, setResponseStatus, getRouterParam, readBody } from "h3";
+import { PrismaClient } from "@prisma/client";
 
+// PUT /api/enricher_data/:enricher_id
 export default defineEventHandler(async (event) => {
-  const prisma = event.context.prisma as any; // PrismaClient attached via plugin
-  const idParam = getRouterParam(event, "analyzer_id") ?? getRouterParam(event, "id");
-  const analyzerId = Number(idParam);
+  const prisma = new PrismaClient() as any;
+  const idParam = getRouterParam(event, "enricher_id") ?? getRouterParam(event, "id");
+  const enricherId = Number(idParam);
 
   if (!idParam) {
     setResponseStatus(event, 400);
-    return { success: false, error: "analyzer_id is required in the path." };
+    return { success: false, error: "enricher_id is required in the path." };
   }
-  if (!Number.isInteger(analyzerId) || analyzerId <= 0) {
+  if (!Number.isInteger(enricherId) || enricherId <= 0) {
     setResponseStatus(event, 400);
-    return { success: false, error: "analyzer_id must be a positive integer." };
+    return { success: false, error: "enricher_id must be a positive integer." };
   }
 
   const body = await readBody(event);
 
-  // Only allow model fields to be updated
   const allowedFields: string[] = [
     "profile_url",
-    "confidence_percentage",
+    "timestamp",
     "full_name",
     "email",
     "phone_number",
@@ -52,6 +53,7 @@ export default defineEventHandler(async (event) => {
   ];
 
   const dateFields: string[] = [
+    "timestamp",
     "birthdate",
     "internship_end_date1",
     "internship_end_date2",
@@ -61,49 +63,35 @@ export default defineEventHandler(async (event) => {
   let hasAny = false;
 
   for (const key of allowedFields) {
-    if (!(key in body)) continue; // skip fields not provided
+    if (!(key in body)) continue;
     hasAny = true;
 
-    const val = (body as any)[key];
+    const val = body[key as keyof typeof body];
 
     if (dateFields.includes(key)) {
       if (val === null || val === undefined || val === "") {
         data[key] = null;
       } else {
-        const d = val instanceof Date ? val : new Date(val);
+        const d = val instanceof Date ? val : new Date(val as any);
         if (Number.isNaN(d.getTime())) {
           setResponseStatus(event, 400);
           return { success: false, error: `Invalid date for '${key}'. Use ISO-8601.` };
         }
         data[key] = d;
       }
-    } else if (key === "confidence_percentage") {
-      if (val === null || val === undefined || val === "") {
-        data[key] = null;
-      } else {
-        const f = typeof val === "number" ? val : Number(val);
-        if (Number.isNaN(f)) {
-          setResponseStatus(event, 400);
-          return { success: false, error: "confidence_percentage must be a number." };
-        }
-        data[key] = f;
-      }
     } else {
-      data[key] = val; // strings/nullable strings
+      data[key] = val;
     }
   }
 
   if (!hasAny) {
     setResponseStatus(event, 400);
-    return {
-      success: false,
-      error: "Provide at least one field to update.",
-    };
+    return { success: false, error: "Provide at least one field to update." };
   }
 
   try {
-    const updated = await prisma.confirmed_alumni.update({
-      where: { analyzer_id: analyzerId },
+    const updated = await prisma.enricher_data.update({
+      where: { enricher_id: enricherId },
       data,
     });
 
@@ -111,12 +99,8 @@ export default defineEventHandler(async (event) => {
     return { success: true, data: updated };
   } catch (error: any) {
     if (error?.code === "P2025") {
-      // Prisma: record not found
       setResponseStatus(event, 404);
-      return {
-        success: false,
-        error: `No confirmed_alumni found with analyzer_id=${analyzerId}`,
-      };
+      return { success: false, error: `No enricher_data found with enricher_id=${enricherId}` };
     }
     const msg = error instanceof Error ? error.message : "Unknown error occurred";
     setResponseStatus(event, 500);

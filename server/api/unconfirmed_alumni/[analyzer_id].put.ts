@@ -1,25 +1,26 @@
 import { defineEventHandler, setResponseStatus, getRouterParam, readBody } from "h3";
+import { PrismaClient } from "@prisma/client";
 
-// PUT /api/enricher_data/:enricher_id
+// PUT /api/unconfirmed_alumni/:analyzer_id
 export default defineEventHandler(async (event) => {
-  const prisma = event.context.prisma as any;
-  const idParam = getRouterParam(event, "enricher_id") ?? getRouterParam(event, "id");
-  const enricherId = Number(idParam);
+  const prisma = new PrismaClient() as any;
+  const idParam = getRouterParam(event, "analyzer_id") ?? getRouterParam(event, "id");
+  const analyzerId = Number(idParam);
 
   if (!idParam) {
     setResponseStatus(event, 400);
-    return { success: false, error: "enricher_id is required in the path." };
+    return { success: false, error: "analyzer_id is required in the path." };
   }
-  if (!Number.isInteger(enricherId) || enricherId <= 0) {
+  if (!Number.isInteger(analyzerId) || analyzerId <= 0) {
     setResponseStatus(event, 400);
-    return { success: false, error: "enricher_id must be a positive integer." };
+    return { success: false, error: "analyzer_id must be a positive integer." };
   }
 
   const body = await readBody(event);
 
   const allowedFields: string[] = [
     "profile_url",
-    "timestamp",
+    "confidence_percentage",
     "full_name",
     "email",
     "phone_number",
@@ -52,7 +53,6 @@ export default defineEventHandler(async (event) => {
   ];
 
   const dateFields: string[] = [
-    "timestamp",
     "birthdate",
     "internship_end_date1",
     "internship_end_date2",
@@ -78,6 +78,17 @@ export default defineEventHandler(async (event) => {
         }
         data[key] = d;
       }
+    } else if (key === "confidence_percentage") {
+      if (val === null || val === undefined || val === "") {
+        data[key] = null;
+      } else {
+        const f = typeof val === "number" ? val : Number(val as any);
+        if (Number.isNaN(f)) {
+          setResponseStatus(event, 400);
+          return { success: false, error: "confidence_percentage must be a number." };
+        }
+        data[key] = f;
+      }
     } else {
       data[key] = val;
     }
@@ -89,8 +100,8 @@ export default defineEventHandler(async (event) => {
   }
 
   try {
-    const updated = await prisma.enricher_data.update({
-      where: { enricher_id: enricherId },
+    const updated = await prisma.unconfirmed_alumni.update({
+      where: { analyzer_id: analyzerId },
       data,
     });
 
@@ -99,7 +110,7 @@ export default defineEventHandler(async (event) => {
   } catch (error: any) {
     if (error?.code === "P2025") {
       setResponseStatus(event, 404);
-      return { success: false, error: `No enricher_data found with enricher_id=${enricherId}` };
+      return { success: false, error: `No unconfirmed_alumni found with analyzer_id=${analyzerId}` };
     }
     const msg = error instanceof Error ? error.message : "Unknown error occurred";
     setResponseStatus(event, 500);

@@ -1,10 +1,15 @@
 import { defineEventHandler, readBody, setResponseStatus } from "h3";
+import { PrismaClient } from "@prisma/client";
+import { PrismaClient } from "@prisma/client";
 
-// POST /api/unconfirmed_alumni
+// POST /api/confirmed_alumni
+// Creates a confirmed_alumni record. All fields are optional except the PK,
+// which is autoincremented by Prisma/SQLite.
 export default defineEventHandler(async (event) => {
-  const prisma = event.context.prisma as any;
+  const prisma = new PrismaClient(); 
   const body = await readBody(event);
 
+  // Accept only schema fields; coerce known DateTime/Float fields
   const allowedFields: string[] = [
     "profile_url",
     "confidence_percentage",
@@ -49,33 +54,47 @@ export default defineEventHandler(async (event) => {
   for (const key of allowedFields) {
     if (body[key] === undefined) continue;
 
-    const val = body[key];
     if (dateFields.includes(key)) {
-      const d = val instanceof Date ? val : new Date(val);
+      // Allow ISO string or Date; reject bad dates
+      const d = body[key] instanceof Date ? body[key] : new Date(body[key]);
       if (Number.isNaN(d.getTime())) {
         setResponseStatus(event, 400);
-        return { success: false, error: `Invalid date for '${key}'. Use ISO-8601.` };
+        return {
+          success: false,
+          error: `Invalid date for '${key}'. Use ISO-8601 (e.g., "2025-10-18T15:30:00Z").`,
+        };
       }
       data[key] = d;
     } else if (key === "confidence_percentage") {
-      const f = typeof val === "number" ? val : Number(val);
+      const f =
+        typeof body[key] === "number" ? body[key] : Number(body[key] as any);
       if (Number.isNaN(f)) {
         setResponseStatus(event, 400);
-        return { success: false, error: "confidence_percentage must be a number." };
+        return {
+          success: false,
+          error: "confidence_percentage must be a number",
+        };
       }
       data[key] = f;
     } else {
-      data[key] = val;
+      data[key] = body[key];
     }
   }
 
   try {
-    const created = await prisma.unconfirmed_alumni.create({ data });
+    const created = await prisma.confirmed_alumni.create({ data });
     setResponseStatus(event, 201);
-    return { success: true, data: created };
+    return {
+      success: true,
+      data: created,
+    };
   } catch (error) {
-    const msg = error instanceof Error ? error.message : "Unknown error occurred";
+    const message =
+      error instanceof Error ? error.message : "Unknown error occurred";
     setResponseStatus(event, 500);
-    return { success: false, error: `Error creating unconfirmed_alumni: ${msg}` };
+    return {
+      success: false,
+      error: `Error creating confirmed_alumni: ${message}`,
+    };
   }
 });
