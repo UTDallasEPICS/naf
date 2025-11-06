@@ -1,6 +1,5 @@
 import { defineEventHandler, readBody, setResponseStatus } from "h3";
 import { PrismaClient } from "@prisma/client";
-import { PrismaClient } from "@prisma/client";
 
 // POST /api/confirmed_alumni
 // Creates a confirmed_alumni record. All fields are optional except the PK,
