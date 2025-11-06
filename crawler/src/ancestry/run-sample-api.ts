@@ -1,5 +1,6 @@
 import fs from 'node:fs/promises';
 import { bulkRequestNamesFromAncestry, type RequestNamesArgs } from './request-names-from-ancestry';
+import { /*bulkRequestNamesFromAncestry, */puppeteerRequestNames } from './request-ancestry-puppeteer';
 
 const sampleRequestArgs: RequestNamesArgs = {
   year: 1991,
@@ -14,13 +15,12 @@ const sampleRequestArgs: RequestNamesArgs = {
 async function testAncestry() {
   const results = (await bulkRequestNamesFromAncestry({
       ...sampleRequestArgs,
-      fetch: { pageLimit: 50, mode: "limited" },
+      fetch: { pageLimit: 10, mode: "limited" },
       // fetch: { mode: "unlimited" },
-    })).map(
-    (item) => [item.recordId, item.fields.find((field) => field.label === "Name")?.text],
+    })
   );
   
-  await fs.writeFile("scratch.results.json", JSON.stringify(results, null, 2));
+  //await fs.writeFile("scratch.results.json", JSON.stringify(results, null, 2));
 }
 
 testAncestry().then(() => {
