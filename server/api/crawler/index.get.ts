@@ -5,11 +5,11 @@ export default defineEventHandler(async (event) => {
   const prisma = new PrismaClient();
 
   try {
-    const alumni = await prisma.unconfirmed_alumni.findMany({
-      orderBy: { analyzer_id: 'desc' }
+    const data = await prisma.crawler_data.findMany({
+      orderBy: { crawler_id: 'desc' }
     });
 
-    return { success: true, data: alumni };
+    return { success: true, data };
   } catch (error) {
     const msg = error instanceof Error ? error.message : "Unknown error";
     setResponseStatus(event, 500);

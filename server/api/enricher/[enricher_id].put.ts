@@ -1,0 +1,109 @@
+import { defineEventHandler, setResponseStatus, getRouterParam, readBody } from "h3";
+import { PrismaClient } from "@prisma/client";
+
+// PUT /api/enricher_data/:enricher_id
+export default defineEventHandler(async (event) => {
+  const prisma = new PrismaClient() as any;
+  const idParam = getRouterParam(event, "enricher_id") ?? getRouterParam(event, "id");
+  const enricherId = Number(idParam);
+
+  if (!idParam) {
+    setResponseStatus(event, 400);
+    return { success: false, error: "enricher_id is required in the path." };
+  }
+  if (!Number.isInteger(enricherId) || enricherId <= 0) {
+    setResponseStatus(event, 400);
+    return { success: false, error: "enricher_id must be a positive integer." };
+  }
+
+  const body = await readBody(event);
+
+  const allowedFields: string[] = [
+    "profile_url",
+    "timestamp",
+    "full_name",
+    "email",
+    "phone_number",
+    "high_school",
+    "hs_graduation_year",
+    "naf_academy",
+    "naf_track_certified",
+    "address",
+    "city",
+    "state",
+    "zip_code",
+    "birthdate",
+    "gender",
+    "ethnicity",
+    "military_branch_served",
+    "current_job",
+    "college_major",
+    "university_grad_year",
+    "university",
+    "degree",
+    "linkedin_link",
+    "school_district",
+    "internship_company1",
+    "internship_end_date1",
+    "internship_company2",
+    "internship_end_date2",
+    "university2",
+    "college_major2",
+    "degree2",
+  ];
+
+  const dateFields: string[] = [
+    "timestamp",
+    "birthdate",
+    "internship_end_date1",
+    "internship_end_date2",
+  ];
+
+  const data: Record<string, any> = {};
+  let hasAny = false;
+
+  for (const key of allowedFields) {
+    if (!(key in body)) continue;
+    hasAny = true;
+
+    const val = body[key as keyof typeof body];
+
+    if (dateFields.includes(key)) {
+      if (val === null || val === undefined || val === "") {
+        data[key] = null;
+      } else {
+        const d = val instanceof Date ? val : new Date(val as any);
+        if (Number.isNaN(d.getTime())) {
+          setResponseStatus(event, 400);
+          return { success: false, error: `Invalid date for '${key}'. Use ISO-8601.` };
+        }
+        data[key] = d;
+      }
+    } else {
+      data[key] = val;
+    }
+  }
+
+  if (!hasAny) {
+    setResponseStatus(event, 400);
+    return { success: false, error: "Provide at least one field to update." };
+  }
+
+  try {
+    const updated = await prisma.enricher_data.update({
+      where: { enricher_id: enricherId },
+      data,
+    });
+
+    setResponseStatus(event, 200);
+    return { success: true, data: updated };
+  } catch (error: any) {
+    if (error?.code === "P2025") {
+      setResponseStatus(event, 404);
+      return { success: false, error: `No enricher_data found with enricher_id=${enricherId}` };
+    }
+    const msg = error instanceof Error ? error.message : "Unknown error occurred";
+    setResponseStatus(event, 500);
+    return { success: false, error: msg };
+  }
+});
