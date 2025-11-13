@@ -1,15 +1,16 @@
 {
-    "extends": "@tsconfig/node22/tsconfig.json",
-    "compilerOptions": {
-        "module": "NodeNext",
-        "moduleResolution": "nodenext",
-        "target": "ES2022",
-        "sourceMap": true,
-        "esModuleInterop": true,
-        "outDir": "dist",
-        "forceConsistentCasingInFileNames": true,
-        "allowSyntheticDefaultImports": true
-    },
-    "include": ["src/**/*"],
-    "exclude": ["node_modules"]
+  "extends": "@tsconfig/node22/tsconfig.json",
+  "compilerOptions": {
+    "module": "NodeNext",
+    "moduleResolution": "nodenext",
+    "target": "ES2022",
+    "sourceMap": true,
+    "esModuleInterop": true,
+    "outDir": "dist",
+    "lib": ["DOM", "esnext"],
+    "forceConsistentCasingInFileNames": true,
+    "allowSyntheticDefaultImports": true
+  },
+  "include": ["src/**/*"],
+  "exclude": ["node_modules"]
 }
