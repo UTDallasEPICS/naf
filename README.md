@@ -10,7 +10,8 @@ The **NAF Alumni Tracking System** is a web-scraping project intended to automat
 - **Data Collection & Processing:**
   - **Automated Profile Searching:**
     - Utilize Google Custom Search API to find LinkedIn profies based on predefinted queries (e.g., site:linkedin.com/in "NAFTrack").
-    - Fetch the search resultes in pages.
+    - Fetch the search results in pages.
+    - Get lists of students by directly asking NAF-affiliated schools
   - **LinkedIn Profile Scraping:**
     - Navigate to individual LinkedIn profile URLs obtained from the search results.
     - Attempt to bypass LinkedIn's authentication wall using different methods (e.g., refer manipulation, retries, simulating normal browser).
@@ -32,7 +33,14 @@ The **NAF Alumni Tracking System** is a web-scraping project intended to automat
       - Internship Company & End Date
     - Convert the extracted data into a structured JSON format.
     - Store the JSON data in a PostgreSQL database, linking it to the profile URL.
-    - Handle conversion of multiplke HTML files to JSON as soon as they are processed.
+    - Handle conversion of multiple HTML files to JSON as soon as they are processed.
+  - **Data Display**
+    - Show all relevant data in a user-friendly dashboard
+    - The dashboard should show data for:
+      - Crawler
+      - Enricher
+      - Unconfirmed Alumni (not fully confident they were part of NAF)
+      - Confirmed Alumni (fully confident they were part of NAF)
 
 ## Third Party Integrations
 - **Google Custom Search API:**
@@ -43,6 +51,7 @@ The **NAF Alumni Tracking System** is a web-scraping project intended to automat
   - Used to manage the database using a admin account where every JSON file is stored 
 
 ## Technology Stack
+- **Framework**: Nuxt.js
 - **Language**: TypeScript
 - **Runtime Environment**: Node.js (implied by TypeScript usage)
 - **Web Scraping & Automation**:
@@ -51,7 +60,11 @@ The **NAF Alumni Tracking System** is a web-scraping project intended to automat
 - **Database**:
   - **PostgreSQL**: Alumni data is stored in a PostgreSQL database in JSON structured format
   - **pg (Node.js PostgreSQL client)**: Used to connect to and interact with the PostgreSQL database.
-- **Enviornment Management**: `dotenv`: Used to load environment variables (e.g., API keys, database credentials) from a `.env` file.
+  - **Prisma**: Used to interface with the database using API calls.
+- **Environment Management**: `dotenv`: Used to load environment variables (e.g., API keys, database credentials) from a `.env` file.
+
+## Other Tools
+- **Postman**: Easily test API calls
 
 ## Setting Up Development Environment
 - Install [git](https://git-scm.com/downloads), [Node.js](https://nodejs.org/en/download) 22 or higher, and [Docker Desktop](https://www.docker.com/products/docker-desktop/) on your computer.
@@ -64,3 +77,7 @@ The **NAF Alumni Tracking System** is a web-scraping project intended to automat
 - Fill out the variables in the `.env`. file using the directions in the comments.
   - These variables are used by the code to configure database access and credentials to access the Google Search API. 
 - Run `docker compose up` in the root directory to run the analyzer, crawler, and a pgAdmin instance (a tool allowing you to inspect a PostgreSQL database visually).
+
+**MIGHT NEED TO CHANGE THIS**
+- Run `cd NAF - Frontend` and `npm install` to install dependencies for the frontend. 
+- Run `npm run dev`. The project will then run in a localhost browser.
