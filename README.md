@@ -77,7 +77,5 @@ The **NAF Alumni Tracking System** is a web-scraping project intended to automat
 - Fill out the variables in the `.env`. file using the directions in the comments.
   - These variables are used by the code to configure database access and credentials to access the Google Search API. 
 - Run `docker compose up` in the root directory to run the analyzer, crawler, and a pgAdmin instance (a tool allowing you to inspect a PostgreSQL database visually).
-
-**MIGHT NEED TO CHANGE THIS**
-- Run `cd NAF - Frontend` and `npm install` to install dependencies for the frontend. 
+- Run `cd "NAF - Frontend"` and `npm install` to install dependencies for the frontend. 
 - Run `npm run dev`. The project will then run in a localhost browser.
