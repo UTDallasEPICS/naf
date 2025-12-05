@@ -1,11 +1,17 @@
-import { Builder } from 'selenium-webdriver';
-import { Options } from 'selenium-webdriver/chrome.js';
+// import { Builder } from 'selenium-webdriver';
+// import { Options } from 'selenium-webdriver/chrome.js';
+import puppeteer, { VanillaPuppeteer } from 'puppeteer-extra';
+import StealthPlugin from 'puppeteer-extra-plugin-stealth';
 import dotenv from 'dotenv';
 import { LinkedInScraper } from './linkedinScraper.js';
 import { convertNewHtmlFiles } from './html_json.js'; // Import the batch conversion function
 
 // Load environment variables.
-dotenv.config();
+console.log(dotenv.config());
+// console.log(' .env file: ' + JSON.stringify(process.env))
+
+//Set Puppeteer to stealth mode
+puppeteer.use(StealthPlugin());
 
 // Define TypeScript interfaces for Google API data structures.
 interface GoogleApiItem {
@@ -37,44 +43,55 @@ async function searchAndAccessLinkedInProfiles() {
   let allItems: GoogleApiItem[] = [];
 
   // Configure Chrome options for WebDriver.
-  const chromeOptions = new Options();
-  chromeOptions.addArguments(
-    '--headless=new',
-    '--disable-gpu',
-    '--no-sandbox',
-    '--disable-dev-shm-usage',
-    '--disable-blink-features=AutomationControlled',
-    '--window-size=1920,1080',
-    '--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36'
-  );
-  chromeOptions.setUserPreferences({
-    'excludeSwitches': ['enable-automation'],
-    'useAutomationExtension': false,
-    'credentials_enable_service': false
-  });
+  // const chromeOptions = new Options();
+  // chromeOptions.addArguments(
+  //   '--headless=new',
+  //   '--disable-gpu',
+  //   '--no-sandbox',
+  //   '--disable-dev-shm-usage',
+  //   '--disable-blink-features=AutomationControlled',
+  //   '--window-size=1920,1080',
+  //   '--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36'
+  // );
+  // chromeOptions.setUserPreferences({
+  //   'excludeSwitches': ['enable-automation'],
+  //   'useAutomationExtension': false,
+  //   'credentials_enable_service': false
+  // });
 
-  // Initialize WebDriver.
-  const driver = await new Builder()
-    .forBrowser('chrome')
-    .setChromeOptions(chromeOptions)
-    .build();
+  // Initialize Puppeteer Headless Browser.
+  // const driver = await new Builder()
+  //   .forBrowser('chrome')
+  //   .setChromeOptions(chromeOptions)
+  //   .build();
+  // const browser = await puppeteer.launch({args: ["--no-sandbox", "--disable-setuid-sandbox"], headless: true, devtools: true})
+  const browser = await puppeteer.launch({
+    headless: true,
+    args: [
+      "--no-sandbox",
+      "--disable-setuid-sandbox",
+      "--window-size=1920,1080",
+      "--disable-blink-features=AutomationControlled"
+    ]
+  });
 
   // Main execution block.
   try {
     // Modify browser properties to hide automation.
-    await driver.executeScript(`
-      Object.defineProperty(navigator, 'webdriver', { get: () => false });
-      window.navigator.chrome = { runtime: {} };
-      if (window.navigator.permissions) {
-        const originalQuery = window.navigator.permissions.query;
-        window.navigator.permissions.query = (parameters) => (
-          parameters.name === 'notifications' ? Promise.resolve({ state: Notification.permission }) : originalQuery(parameters)
-        );
-      }
-    `);
-
+    // await driver.executeScript(`
+    //   Object.defineProperty(navigator, 'webdriver', { get: () => false });
+    //   window.navigator.chrome = { runtime: {} };
+    //   if (window.navigator.permissions) {
+    //     const originalQuery = window.navigator.permissions.query;
+    //     window.navigator.permissions.query = (parameters) => (
+    //       parameters.name === 'notifications' ? Promise.resolve({ state: Notification.permission }) : originalQuery(parameters)
+    //     );
+    //   }
+    // `);
+    
     // Initialize scraper.
-    const scraper = new LinkedInScraper(driver, 15, 2000); 
+    const page = await browser.newPage();
+    const scraper = new LinkedInScraper(browser, page, 15, 2000); 
     await convertNewHtmlFiles(); // Process any existing HTML files first
 
     // Start search.
@@ -93,12 +110,23 @@ async function searchAndAccessLinkedInProfiles() {
 
         try {
              // Fetch results for one page via browser script.
-            const data = await driver.executeAsyncScript(function(urlToFetch: string, callback: (result: GoogleApiResponse) => void) {
-                fetch(urlToFetch)
-                    .then(response => response.json())
-                    .then(result => callback(result as GoogleApiResponse))
-                    .catch(error => callback({ error: error.toString() }));
-            }, url) as GoogleApiResponse;
+            
+            // const data = await driver.executeAsyncScript(function(urlToFetch: string, callback: (result: GoogleApiResponse) => void) {
+            //     fetch(urlToFetch)
+            //         .then(response => response.json())
+            //         .then(result => callback(result as GoogleApiResponse))
+            //         .catch(error => callback({ error: error.toString() }));
+            // }, url) as GoogleApiResponse;
+            // const page = await browser.newPage();
+            const data = await page.evaluate(async (urlToFetch) => {
+            try {
+              const res = await fetch(urlToFetch);
+              return await res.json();
+            } catch (e) {
+              return { error: String(e) };
+            }
+          }, url);
+
 
             // Handle response data or errors for the page.
             if (data.error) {
@@ -131,7 +159,9 @@ async function searchAndAccessLinkedInProfiles() {
       console.log(`\nFound ${allItems.length} total results. Starting profile processing...`);
       const googleSearchUrl = `https://www.google.com/search?q=${encodeURIComponent(query)}`;
       // Navigate to Google search page (referer).
-      await driver.get(googleSearchUrl);
+      // const page = await browser.newPage();
+      page.goto(googleSearchUrl);
+
       await new Promise(resolve => setTimeout(resolve, 2000 + Math.random() * 1000)); // Wait after navigating
 
       // Initiate profile processing via the scraper.
@@ -149,8 +179,8 @@ async function searchAndAccessLinkedInProfiles() {
     console.error('An error occurred during the process:', error);
   // Ensure browser closes properly.
   } finally {
-    if (driver) { // Check if driver was successfully initialized
-        await driver.quit();
+    if (browser) { // Check if driver was successfully initialized
+        await browser.close();
         console.log("Browser session ended.");
     } else {
         console.log("Driver not initialized, no browser session to end.");

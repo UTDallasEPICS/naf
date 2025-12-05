@@ -1,4 +1,7 @@
-import { WebDriver } from 'selenium-webdriver';
+// import { WebDriver } from 'selenium-webdriver';
+import { Page } from 'puppeteer';
+import puppeteer, { VanillaPuppeteer } from 'puppeteer-extra';
+import StealthPlugin from 'puppeteer-extra-plugin-stealth';
 import * as fs from 'fs';
 import * as path from 'path';
 import { convertSingleFile } from './html_json.js';
@@ -7,16 +10,17 @@ import { convertSingleFile } from './html_json.js';
 export class LinkedInScraper {
   // Declare private properties for the Selenium WebDriver instance, retry settings,
   // directory for saving pages, and a set to track accessed URLs.
-  private driver: WebDriver;
+  private browser: Awaited<ReturnType<VanillaPuppeteer["launch"]>>;
   private maxRetries: number;
   private retryDelay: number;
   private pagesDir: string;
   private accessedUrls: Set<string>;
-
+  private page: Page;
   // Constructor to initialize the scraper with a WebDriver instance and optional retry settings.
   // It also ensures the 'pages' directory exists for storing HTML files.
-  constructor(driver: WebDriver, maxRetries = 10, retryDelay = 1000) {
-    this.driver = driver;
+  constructor(browser: Awaited<ReturnType<VanillaPuppeteer["launch"]>>, page: Page, maxRetries = 10, retryDelay = 1000) {
+    this.browser = browser;
+    this.page = page;
     this.maxRetries = maxRetries;
     this.retryDelay = retryDelay;
     this.pagesDir = path.join(process.cwd(), 'pages'); // Define the path for saving HTML pages
@@ -54,8 +58,16 @@ export class LinkedInScraper {
   // Private method to check if the current page is a LinkedIn authentication wall or signup page.
   // It checks the URL and page source for specific indicators.
   private async isAuthwall(): Promise<boolean> {
-    const currentUrl = await this.driver.getCurrentUrl(); // Get the current URL
-    const pageSource = await this.driver.getPageSource(); // Get the full HTML source of the page
+    const currentUrl = await this.page.url(); // Get the current URL
+    
+    // Ensure that the page has loaded before gathering the content
+    await Promise.all([
+        this.page.waitForNavigation({ waitUntil: 'networkidle2' }),
+        this.page.goto(currentUrl)
+    ]);
+    await this.page.waitForSelector('body');
+    const pageSource = await this.page.content(); // Get the full HTML source of the page
+    
     // Return true if the URL or page source contains authwall/signup keywords.
     return currentUrl.includes('authwall') ||
            currentUrl.includes('signup') ||
@@ -65,46 +77,46 @@ export class LinkedInScraper {
 
   // Private method to simulate human-like interactions on the page.
   // Includes random scrolling and occasional mouse movements.
-  private async simulateHumanBehavior(): Promise<void> {
-    // Scroll down by a random amount.
-    const scrollAmount = Math.floor(Math.random() * 500) + 100;
-    await this.driver.executeScript(`window.scrollBy(0, ${scrollAmount});`);
-    // Wait for a random short delay.
-    const randomDelay = Math.floor(Math.random() * 1000) + 500;
-    await this.delay(randomDelay);
+  // private async simulateHumanBehavior(): Promise<void> {
+  //   // Scroll down by a random amount.
+  //   const scrollAmount = Math.floor(Math.random() * 500) + 100;
+  //   await this.driver.executeScript(`window.scrollBy(0, ${scrollAmount});`);
+  //   // Wait for a random short delay.
+  //   const randomDelay = Math.floor(Math.random() * 1000) + 500;
+  //   await this.delay(randomDelay);
 
-    // Simulate a mouse move event occasionally (30% chance).
-    if (Math.random() > 0.7) {
-      const x = Math.floor(Math.random() * 500);
-      const y = Math.floor(Math.random() * 500);
-      // Execute JavaScript to dispatch a 'mousemove' event.
-      await this.driver.executeScript(`
-        const event = new MouseEvent('mousemove', {
-          'view': window,
-          'bubbles': true,
-          'cancelable': true,
-          'clientX': ${x},
-          'clientY': ${y}
-        });
-        document.dispatchEvent(event);
-      `);
-    }
-  }
+  //   // Simulate a mouse move event occasionally (30% chance).
+  //   if (Math.random() > 0.7) {
+  //     const x = Math.floor(Math.random() * 500);
+  //     const y = Math.floor(Math.random() * 500);
+  //     // Execute JavaScript to dispatch a 'mousemove' event.
+  //     await this.driver.executeScript(`
+  //       const event = new MouseEvent('mousemove', {
+  //         'view': window,
+  //         'bubbles': true,
+  //         'cancelable': true,
+  //         'clientX': ${x},
+  //         'clientY': ${y}
+  //       });
+  //       document.dispatchEvent(event);
+  //     `);
+  //   }
+  // }
 
   // Private method to manage cookies, specifically removing potential blocking/auth cookies
   // and ensuring the language cookie is set to English.
   private async manageCookies(): Promise<void> {
-    const cookies = await this.driver.manage().getCookies(); // Get all cookies
+    const cookies = await this.browser.cookies(); // Get all cookies
     // Iterate through cookies and delete any LinkedIn auth/block related cookies.
     for (const cookie of cookies) {
       if (cookie.domain?.includes('linkedin.com') &&
           (cookie.name.includes('auth') || cookie.name.includes('block'))) {
-        await this.driver.manage().deleteCookie(cookie.name);
+        await this.browser.deleteCookie(cookie);
       }
     }
 
     // Add/ensure the language cookie is set to English for consistency.
-    await this.driver.manage().addCookie({
+    await this.browser.setCookie({
       name: 'lang',
       value: 'v=2&lang=en-us',
       domain: '.linkedin.com'
@@ -152,10 +164,10 @@ export class LinkedInScraper {
 
     let attempts = 0;
     // Navigate initially via Google to potentially set better referrers/cookies.
-    await this.driver.get('https://www.google.com/');
+    await this.page.goto('https://www.google.com/');
     await this.delay(1500 + Math.random() * 500); // Wait a bit
     // Use JavaScript to navigate to the profile URL.
-    await this.driver.executeScript(`
+    await this.page.evaluate(`
       window.location.href = "${profileUrl}";
     `);
     console.log(`Trying to access: ${profileUrl}`);
@@ -166,28 +178,28 @@ export class LinkedInScraper {
 
       // Employ different navigation strategies based on the attempt number.
       if (attempts % 3 === 0) { // Strategy 1: Go back to search results, then open profile in same tab.
-        await this.driver.get(searchResultUrl);
+        await this.page.goto(searchResultUrl);
         await this.delay(this.retryDelay);
-        await this.driver.executeScript(`window.open("${profileUrl}", "_self");`);
+        await this.page.evaluate(`window.open("${profileUrl}", "_self");`);
       } else if (attempts % 3 === 1) { // Strategy 2: Go to Google, manipulate history, then navigate.
-        await this.driver.get('https://www.google.com/');
+        await this.page.goto('https://www.google.com/');
         await this.delay(this.retryDelay);
-        await this.driver.executeScript(`
+        await this.page.evaluate(`
           history.pushState({}, '', '${searchResultUrl}');
           window.location.href = "${profileUrl}";
         `);
       } else { // Strategy 3: Go back to search results, wait slightly, then navigate.
-        await this.driver.get(searchResultUrl);
+        await this.page.goto(searchResultUrl);
         await this.delay(this.retryDelay);
-        await this.driver.executeScript(`
+        await this.page.evaluate(`
           setTimeout(() => { window.location.href = "${profileUrl}"; }, 500);
         `);
         await this.delay(1000); // Extra delay after triggering navigation
       }
 
-      // Manage cookies and simulate human behavior between attempts.
+    //   // Manage cookies and simulate human behavior between attempts.
       await this.manageCookies();
-      await this.simulateHumanBehavior();
+      // await this.simulateHumanBehavior();
       attempts++;
       await this.delay(this.retryDelay + Math.random() * 1000); // Wait before the next check/attempt
     }
@@ -205,8 +217,8 @@ export class LinkedInScraper {
     // Try to save the HTML source of the successfully accessed profile page.
     try {
       await this.delay(2000 + Math.random() * 1000); // Wait for the page to potentially load fully
-      await this.simulateHumanBehavior(); // Perform some actions before saving
-      const pageSource = await this.driver.getPageSource(); // Get the final page source
+      // await this.simulateHumanBehavior(); // Perform some actions before saving
+      const pageSource = await this.page.content(); // Get the final page source
       // Extract profile ID and create a timestamped filename.
       const profileId = profileUrl.split('/in/')[1].split('/')[0].split('?')[0];
       const timestamp = new Date().toISOString().replace(/:/g, '-');
