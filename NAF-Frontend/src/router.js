@@ -1,6 +1,6 @@
 import { createRouter, createWebHistory } from "vue-router";
-import SystemControl from "./pages/SystemControl.vue";
-import DatabaseViewer from "./pages/DatabaseViewer.vue";
+import SystemControl from "../pages/SystemControl.vue";
+import DatabaseViewer from "../pages/DatabaseViewer.vue";
 
 const routes = [
   { path: "/", redirect: "/system-control" },
