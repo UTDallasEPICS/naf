@@ -79,37 +79,36 @@
 </template>
 
 <script setup>
-import { computed, reactive, ref } from 'vue'
+import { computed, reactive, ref } from "vue"
+import { confirmedAlumniSample } from "../src/data/c"
 
 const columns = [
-  { key: 'fullName', label: 'Name' },
-  { key: 'jobTitle', label: 'Job Title' },
-  { key: 'location', label: 'Location' },
-  { key: 'linkedinLink', label: 'linkedinLink' },
-  { key: 'phoneNumber', label: 'High School' },
-  { key: 'highSchool', label: 'High School' },
-  { key: 'HSGraduationYear', label: 'Graduation Year' },
-  { key: 'NAFAcademy', label: 'NAF Academy' },
-  { key: 'NAFTrackCertified', label: 'NAF Track Certified' },
-  { key: 'currentJob', label: 'Current Job' },
-  { key: 'universityGradYear', label: 'College Graduation Year' },
-  { key: 'univeristy', label: 'College' },
-  { key: 'degree', label: 'Degree' },
-  { key: 'internshipCompany1', label: 'Internship Company' },
-  { key: 'internshipEndDate1', label: 'Internship End Date' },
+  { key: "full_name", label: "Name" },
+  { key: "current_job", label: "Current Job" },
+  { key: "city", label: "City" },
+  { key: "linkedin_link", label: "LinkedIn" },
+  { key: "phone_number", label: "Phone Number" },
+  { key: "high_school", label: "High School" },
+  { key: "hs_graduation_year", label: "Graduation Year" },
+  { key: "naf_academy", label: "NAF Academy" },
+  { key: "naf_track_certified", label: "NAF Track Certified" },
+  { key: "university_grad_year", label: "College Graduation Year" },
+  { key: "university", label: "College" },
+  { key: "degree", label: "Degree" },
+  { key: "internship_company1", label: "Internship Company" },
+  { key: "internship_end_date1", label: "Internship End Date" },
 ]
 
-const seedRows = [
-  { id: 1, fullName: 'Place Holder', jobTitle: 'Place Holder', location: 'Place Holder', linkedinLink: 'Place Holder', phoneNumber: "Place Holder", highSchool: "Place Holder", HSGraduationYear: "Place Holder", NAFAcademy: "Place Holder", NAFTrackCertified: "Place Holder", currentJob: "Place Holder", universityGradYear: "Place Holder",univeristy: "Place Holder",degree: "Place Holder",internshipCompany1: "Place Holder",internshipEndDate1: "Place Holder" },
-  { id: 2, fullName: 'Place Holder', jobTitle: 'Place Holder', location: 'Place Holder', linkedinLink: 'Place Holder', phoneNumber: "Place Holder", highSchool: "Place Holder", HSGraduationYear: "Place Holder", NAFAcademy: "Place Holder", NAFTrackCertified: "Place Holder", currentJob: "Place Holder", universityGradYear: "Place Holder",univeristy: "Place Holder",degree: "Place Holder",internshipCompany1: "Place Holder",internshipEndDate1: "Place Holder" },
-  { id: 3, fullName: 'Place Holder', jobTitle: 'Place Holder', location: 'Place Holder', linkedinLink: 'Place Holder', phoneNumber: "Place Holder", highSchool: "Place Holder", HSGraduationYear: "Place Holder", NAFAcademy: "Place Holder", NAFTrackCertified: "Place Holder", currentJob: "Place Holder", universityGradYear: "Place Holder",univeristy: "Place Holder",degree: "Place Holder",internshipCompany1: "Place Holder",internshipEndDate1: "Place Holder" },
-  { id: 4, fullName: 'Place Holder', jobTitle: 'Place Holder', location: 'Place Holder', linkedinLink: 'Place Holder', phoneNumber: "Place Holder", highSchool: "Place Holder", HSGraduationYear: "Place Holder", NAFAcademy: "Place Holder", NAFTrackCertified: "Place Holder", currentJob: "Place Holder", universityGradYear: "Place Holder",univeristy: "Place Holder",degree: "Place Holder",internshipCompany1: "Place Holder",internshipEndDate1: "Place Holder" },
-  { id: 5, fullName: 'Place Holder', jobTitle: 'Place Holder', location: 'Place Holder', linkedinLink: 'Place Holder', phoneNumber: "Place Holder", highSchool: "Place Holder", HSGraduationYear: "Place Holder", NAFAcademy: "Place Holder", NAFTrackCertified: "Place Holder", currentJob: "Place Holder", universityGradYear: "Place Holder",univeristy: "Place Holder",degree: "Place Holder",internshipCompany1: "Place Holder",internshipEndDate1: "Place Holder" },
-]
+const seedRows = confirmedAlumniSample.map((alumni) => ({
+  ...alumni,
+  internship_end_date1: alumni.internship_end_date1
+    ? new Date(alumni.internship_end_date1).toISOString().split("T")[0]
+    : "",
+}))
 
 const rows = ref(structuredClone(seedRows))
-const search = ref('')
-const sort = reactive({ key: 'name', order: 'asc' })
+const search = ref("")
+const sort = reactive({ key: "full_name", order: "asc" })
 
 const filteredRows = computed(() => {
   const query = search.value.trim().toLowerCase()
@@ -118,7 +117,7 @@ const filteredRows = computed(() => {
     if (!query) return true
 
     return columns.some((column) =>
-      String(row[column.key] ?? '')
+      String(row[column.key] ?? "")
         .toLowerCase()
         .includes(query)
     )
@@ -128,13 +127,9 @@ const filteredRows = computed(() => {
     const aValue = a[sort.key]
     const bValue = b[sort.key]
 
-    if (typeof aValue === 'number' && typeof bValue === 'number') {
-      return sort.order === 'asc' ? aValue - bValue : bValue - aValue
-    }
-
-    return sort.order === 'asc'
-      ? String(aValue).localeCompare(String(bValue))
-      : String(bValue).localeCompare(String(aValue))
+    return sort.order === "asc"
+      ? String(aValue ?? "").localeCompare(String(bValue ?? ""))
+      : String(bValue ?? "").localeCompare(String(aValue ?? ""))
   })
 
   return result
@@ -142,30 +137,39 @@ const filteredRows = computed(() => {
 
 function sortBy(key) {
   if (sort.key === key) {
-    sort.order = sort.order === 'asc' ? 'desc' : 'asc'
+    sort.order = sort.order === "asc" ? "desc" : "asc"
     return
   }
 
   sort.key = key
-  sort.order = 'asc'
+  sort.order = "asc"
 }
 
 function addRow() {
   rows.value.unshift({
-    id: Date.now(),
-    name: '',
-    department: '',
-    role: '',
-    location: '',
-    salary: 0,
+    analyzer_id: Date.now(),
+    full_name: "",
+    current_job: "",
+    city: "",
+    linkedin_link: "",
+    phone_number: "",
+    high_school: "",
+    hs_graduation_year: "",
+    naf_academy: "",
+    naf_track_certified: "",
+    university_grad_year: "",
+    university: "",
+    degree: "",
+    internship_company1: "",
+    internship_end_date1: "",
   })
 }
 
 function resetData() {
   rows.value = structuredClone(seedRows)
-  search.value = ''
-  sort.key = 'name'
-  sort.order = 'asc'
+  search.value = ""
+  sort.key = "full_name"
+  sort.order = "asc"
 }
 </script>
 
