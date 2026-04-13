@@ -19,7 +19,9 @@
     "prisma": "^6.19.2"
   },
   "dependencies": {
+    "@better-auth/prisma-adapter": "^1.6.2",
     "@prisma/client": "^7.7.0",
+    "better-auth": "^1.6.2",
     "nuxt": "^4.2.0",
     "puppeteer": "^24.36.1"
   }
