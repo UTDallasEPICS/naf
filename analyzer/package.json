@@ -15,8 +15,9 @@
     "typescript": "^5.0.0"
   },
   "dependencies": {
+    "dotenv": "^16.6.1",
+    "google-search-results-nodejs": "^2.1.0",
     "node-geocoder": "^4.4.1",
-    "pg": "^8.11.3",
-    "dotenv": "^16.3.1"
+    "pg": "^8.11.3"
   }
 }
