@@ -33,6 +33,14 @@ const insertMany = db.transaction((namesArray) => {
 
 // run it
 insertMany(names);
+db.exec(`
+  DELETE FROM names
+  WHERE id NOT IN (
+    SELECT MIN(id)
+    FROM names
+    GROUP BY value
+  )
+`);
 
 console.log("Inserted names successfully!");
 const rows = db.prepare("SELECT * FROM names").all();
