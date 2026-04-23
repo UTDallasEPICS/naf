@@ -4,7 +4,7 @@
   "description": "The **NAF Alumni Tracking System** is a web-scraping project intended to automate the gathering, organization, and maintenance of NAF alumni data, primarily from LinkedIn. The core goal is to build a comprehensive database of alumni records. This database will support NAF in fostering long-term engagement with its alumni, building connections, and analyzing career outcomes and trajectories to support NAF’s development initiatives.",
   "main": "index.js",
   "scripts": {
-    "dev": "nuxt dev",
+    "dev": "nuxt --host",
     "build": "nuxt build",
     "generate": "nuxt generate",
     "prisma:generate": "prisma generate",
