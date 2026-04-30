@@ -1,9 +1,8 @@
 import { defineEventHandler, setResponseStatus, getRouterParam, readBody } from "h3";
-import { PrismaClient } from "@prisma/client";
+import { prisma } from "../../utils/prisma";
 
 // PUT /api/crawler_data/:crawler_id
 export default defineEventHandler(async (event) => {
-  const prisma = new PrismaClient() as any;
   const idParam = getRouterParam(event, "crawler_id") ?? getRouterParam(event, "id");
   const crawlerId = Number(idParam);
 
@@ -17,6 +16,10 @@ export default defineEventHandler(async (event) => {
   }
 
   const body = await readBody(event);
+  if (!body || typeof body !== "object" || Array.isArray(body)) {
+    setResponseStatus(event, 400);
+    return { success: false, error: "Request body must be a JSON object." };
+  }
 
   const data: Record<string, any> = {};
   let hasAny = false;
@@ -74,7 +77,12 @@ export default defineEventHandler(async (event) => {
       setResponseStatus(event, 404);
       return { success: false, error: `No crawler_data found with crawler_id=${crawlerId}` };
     }
-    const msg = error instanceof Error ? error.message : "Unknown error occurred";
+    const msg =
+      process.env.NODE_ENV === "production"
+        ? "Internal Server Error"
+        : error instanceof Error
+          ? error.message
+          : "Unknown error occurred";
     setResponseStatus(event, 500);
     return { success: false, error: msg };
   }

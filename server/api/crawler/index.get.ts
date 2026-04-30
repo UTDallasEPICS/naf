@@ -1,9 +1,7 @@
 import { defineEventHandler, setResponseStatus } from "h3";
-import { PrismaClient } from "@prisma/client";
+import { prisma } from "../../utils/prisma";
 
 export default defineEventHandler(async (event) => {
-  const prisma = new PrismaClient();
-
   try {
     const data = await prisma.crawler_data.findMany({
       orderBy: { crawler_id: 'desc' }
@@ -11,7 +9,12 @@ export default defineEventHandler(async (event) => {
 
     return { success: true, data };
   } catch (error) {
-    const msg = error instanceof Error ? error.message : "Unknown error";
+    const msg =
+      process.env.NODE_ENV === "production"
+        ? "Internal Server Error"
+        : error instanceof Error
+          ? error.message
+          : "Unknown error";
     setResponseStatus(event, 500);
     return { success: false, error: msg };
   }

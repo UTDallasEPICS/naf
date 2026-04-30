@@ -1,8 +1,7 @@
 import { defineEventHandler, setResponseStatus, getRouterParam, readBody } from "h3";
-import { PrismaClient } from "@prisma/client";
+import { prisma } from "../../utils/prisma";
 
 export default defineEventHandler(async (event) => {
-  const prisma = new PrismaClient(); // PrismaClient attached via plugin
   const idParam = getRouterParam(event, "analyzer_id") ?? getRouterParam(event, "id");
   const analyzerId = Number(idParam);
 
@@ -16,6 +15,10 @@ export default defineEventHandler(async (event) => {
   }
 
   const body = await readBody(event);
+  if (!body || typeof body !== "object" || Array.isArray(body)) {
+    setResponseStatus(event, 400);
+    return { success: false, error: "Request body must be a JSON object." };
+  }
 
   // Only allow model fields to be updated
   const allowedFields: string[] = [
@@ -119,7 +122,12 @@ export default defineEventHandler(async (event) => {
         error: `No confirmed_alumni found with analyzer_id=${analyzerId}`,
       };
     }
-    const msg = error instanceof Error ? error.message : "Unknown error occurred";
+    const msg =
+      process.env.NODE_ENV === "production"
+        ? "Internal Server Error"
+        : error instanceof Error
+          ? error.message
+          : "Unknown error occurred";
     setResponseStatus(event, 500);
     return { success: false, error: msg };
   }

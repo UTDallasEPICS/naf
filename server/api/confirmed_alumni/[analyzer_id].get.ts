@@ -1,10 +1,8 @@
 import { defineEventHandler, setResponseStatus, getRouterParam } from "h3";
-import { PrismaClient } from "@prisma/client";
+import { prisma } from "../../utils/prisma";
 
 export default defineEventHandler(async (event) => {
-  const prisma = new PrismaClient(); // PrismaClient attached via plugin
   const idParam = getRouterParam(event, "id");
-  console.log(idParam);
   const analyzerId = Number(idParam);
 
   if (!idParam) {
@@ -35,7 +33,12 @@ export default defineEventHandler(async (event) => {
       data: row,
     };
   } catch (error) {
-    const msg = error instanceof Error ? error.message : "Unknown error occurred";
+    const msg =
+      process.env.NODE_ENV === "production"
+        ? "Internal Server Error"
+        : error instanceof Error
+          ? error.message
+          : "Unknown error occurred";
     setResponseStatus(event, 500);
     return { success: false, error: msg };
   }

@@ -1,12 +1,15 @@
 import { defineEventHandler, readBody, setResponseStatus } from "h3";
-import { PrismaClient } from "@prisma/client";
+import { prisma } from "../../utils/prisma";
 
 // POST /api/confirmed_alumni
 // Creates a confirmed_alumni record. All fields are optional except the PK,
 // which is autoincremented by Prisma/SQLite.
 export default defineEventHandler(async (event) => {
-  const prisma = new PrismaClient(); 
   const body = await readBody(event);
+  if (!body || typeof body !== "object" || Array.isArray(body)) {
+    setResponseStatus(event, 400);
+    return { success: false, error: "Request body must be a JSON object." };
+  }
 
   // Accept only schema fields; coerce known DateTime/Float fields
   const allowedFields: string[] = [
@@ -89,7 +92,11 @@ export default defineEventHandler(async (event) => {
     };
   } catch (error) {
     const message =
-      error instanceof Error ? error.message : "Unknown error occurred";
+      process.env.NODE_ENV === "production"
+        ? "Internal Server Error"
+        : error instanceof Error
+          ? error.message
+          : "Unknown error occurred";
     setResponseStatus(event, 500);
     return {
       success: false,

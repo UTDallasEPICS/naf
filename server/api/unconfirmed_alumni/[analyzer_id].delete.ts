@@ -1,9 +1,8 @@
 import { defineEventHandler, setResponseStatus, getRouterParam } from "h3";
-import { PrismaClient } from "@prisma/client";
+import { prisma } from "../../utils/prisma";
 
 // DELETE /api/unconfirmed_alumni/:analyzer_id
 export default defineEventHandler(async (event) => {
-  const prisma = new PrismaClient() as any;
   const idParam = getRouterParam(event, "analyzer_id") ?? getRouterParam(event, "id");
   const analyzerId = Number(idParam);
 
@@ -42,7 +41,12 @@ export default defineEventHandler(async (event) => {
       setResponseStatus(event, 404);
       return { success: false, error: "unconfirmed_alumni not found" };
     }
-    const msg = error instanceof Error ? error.message : "Unknown error occurred";
+    const msg =
+      process.env.NODE_ENV === "production"
+        ? "Internal Server Error"
+        : error instanceof Error
+          ? error.message
+          : "Unknown error occurred";
     setResponseStatus(event, 500);
     return { success: false, error: msg };
   }
